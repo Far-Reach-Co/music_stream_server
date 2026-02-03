@@ -8,6 +8,7 @@ A music streaming server built with FastAPI, FFmpeg, and PostgreSQL-backed sessi
 
 - Python 3.10+
 - FFmpeg installed and available in `$PATH`
+- Redis server
 - AWS S3 bucket with CloudFront distribution
 - CloudFront key pair for signed URLs
 
@@ -58,6 +59,7 @@ CHUNK_SIZE=1024                     # Default: 1024
 LISTENER_QUEUE_MAXSIZE=256          # Default: 256
 IDLE_TIMEOUT=600                    # Default: 600 (seconds)
 LOGIN_URL=https://example.com/login # Redirect URL for unauthenticated users
+REDIS_URL=redis://localhost:6379    # Default: redis://localhost:6379
 ```
 
 ### Admin
@@ -274,6 +276,8 @@ kill -HUP $(pgrep -f "python.*radio.py")
 ## Notes
 
 - Audio files are streamed from CloudFront via signed URLs (3-day expiry)
+- Signed URLs are cached in Redis to avoid regeneration on every play (refreshed 1 hour before expiry)
+- If Redis is unavailable, the server falls back to generating fresh URLs
 - FFmpeg reads directly from the signed URL and transcodes to MP3
 - The server streams `.mp3`, `.wav`, `.ogg`, `.flac` files (any format FFmpeg supports)
 - You must have `ffmpeg` installed and accessible from the command line

@@ -18,7 +18,7 @@ _private_key = None
 
 # Redis client (lazy initialized)
 _redis_client = None
-CACHE_KEY_PREFIX = "signed_url:"
+CACHE_KEY_PREFIX = "signed_url_radio:"
 BUFFER_SECONDS = 3600  # 1 hour buffer before expiry
 
 

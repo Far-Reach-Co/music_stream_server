@@ -16,20 +16,29 @@ logger = logging.getLogger("radio")
 class AudioStreamer:
     def __init__(self, playlist_name: str):
         self.playlist_name = playlist_name
-        self.listener_queues = {}  # key: channel_name, value: set of queues
+        self.listener_queues = {}  # channel_name -> set[Queue]
         self.listener_queues_lock = threading.Lock()
         self.command_queue = queue.Queue()
         self.thread = threading.Thread(target=self._run, daemon=True)
 
+        self.last_listener_time = time.time()
+
     def start(self):
         if not self.thread.is_alive():
             self.thread.start()
+
+    def has_listeners(self) -> bool:
+        with self.listener_queues_lock:
+            return any(len(queues) > 0 for queues in self.listener_queues.values())
 
     def add_listener(self, channel_name, q):
         with self.listener_queues_lock:
             if channel_name not in self.listener_queues:
                 self.listener_queues[channel_name] = set()
             self.listener_queues[channel_name].add(q)
+
+        # Presence matters more than sound
+        self.last_listener_time = time.time()
 
     def remove_listener(self, channel_name, q):
         with self.listener_queues_lock:
@@ -42,7 +51,6 @@ class AudioStreamer:
         self.command_queue.put(cmd)
 
     def _run(self):
-        last_listener_time = time.time()
         while True:
             track_keys = get_playlist(self.playlist_name)
             if not track_keys:
@@ -50,7 +58,6 @@ class AudioStreamer:
                 time.sleep(5)
                 continue
 
-            # Resolve track keys to filenames, skip any that don't exist
             tracks = []
             for key in track_keys:
                 filename = get_track_filename(key)
@@ -67,7 +74,6 @@ class AudioStreamer:
             random.shuffle(tracks)
 
             for track_key, track_filename in tracks:
-                # Generate signed CloudFront URL for this track
                 track_url = get_signed_url(track_filename)
                 logger.info(f"Now playing: {track_key} ({track_filename})")
 
@@ -76,20 +82,14 @@ class AudioStreamer:
                         [
                             "ffmpeg",
                             "-hide_banner",
-                            "-loglevel",
-                            "quiet",
+                            "-loglevel", "quiet",
                             "-re",
-                            "-i",
-                            track_url,
+                            "-i", track_url,
                             "-vn",
-                            "-acodec",
-                            "libmp3lame",
-                            "-ar",
-                            "44100",
-                            "-b:a",
-                            "128k",
-                            "-f",
-                            "mp3",
+                            "-acodec", "libmp3lame",
+                            "-ar", "44100",
+                            "-b:a", "128k",
+                            "-f", "mp3",
                             "-",
                         ],
                         stdout=subprocess.PIPE,
@@ -106,6 +106,7 @@ class AudioStreamer:
 
                 try:
                     while True:
+                        # --- commands ---
                         try:
                             cmd = self.command_queue.get_nowait()
                             if cmd == "stop":
@@ -114,33 +115,35 @@ class AudioStreamer:
                             elif cmd == "next":
                                 logger.info("[Streamer] Skipping track.")
                                 break
-                            # Removed "change" command - playlist changes handled via Channel.play_playlist()
                         except queue.Empty:
                             pass
 
-                        assert proc.stdout is not None
-                        chunk = proc.stdout.read(CHUNK_SIZE)
-                        if chunk:
-                            with self.listener_queues_lock:
-                                if any(self.listener_queues.values()):
-                                    last_listener_time = time.time()
-                                for listeners in list(self.listener_queues.values()):
-                                    for q in listeners:
-                                        try:
-                                            q.put_nowait(chunk)
-                                        except queue.Full:
-                                            pass
-                        else:
-                            logger.info("[Streamer] End of track reached.")
-                            break
-
-                        if time.time() - last_listener_time > IDLE_TIMEOUT:
+                        # --- idle detection ---
+                        if self.has_listeners():
+                            self.last_listener_time = time.time()
+                        elif time.time() - self.last_listener_time > IDLE_TIMEOUT:
                             logger.info(
                                 f"[Streamer] No listeners for {IDLE_TIMEOUT} seconds. Exiting."
                             )
                             return
+
+                        # --- audio read ---
+                        assert proc.stdout is not None
+                        chunk = proc.stdout.read(CHUNK_SIZE)
+
+                        if not chunk:
+                            logger.info("[Streamer] End of track reached.")
+                            break
+
+                        with self.listener_queues_lock:
+                            for listeners in self.listener_queues.values():
+                                for q in listeners:
+                                    try:
+                                        q.put_nowait(chunk)
+                                    except queue.Full:
+                                        pass
+
                 finally:
-                    # Ensure FFmpeg process is properly cleaned up
                     if proc.poll() is None:
                         proc.kill()
                     if proc.stdout:

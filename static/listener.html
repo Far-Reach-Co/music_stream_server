@@ -11,6 +11,7 @@
 
   <button id="start-button">▶️ Start Listening</button><br /><br />
   <p><strong>Listening Channel:</strong> <span id="channel-name"></span></p>
+  <p><strong>Now Playing:</strong> <span id="now-playing">(not playing)</span></p>
 
   <audio id="radio" preload="none" style="display: none"></audio><br />
 
@@ -65,6 +66,34 @@
       audio.volume = volValue;
       volumeDisplay.textContent = volPercent + "%";
     });
+
+    // Poll /nowplaying to update currently playing track
+    const nowEl = document.getElementById('now-playing');
+    let nowTimer = null;
+    function fetchNowPlaying() {
+      if (!channel) return;
+      fetch('/nowplaying?channel=' + encodeURIComponent(channel)).then(r => r.json()).then(data => {
+        if (!data) {
+          nowEl.textContent = '(unknown)';
+          return;
+        }
+        if (data.track_title) {
+          nowEl.textContent = `${data.track_title}${data.album ? ' — ' + data.album : ''}`;
+        } else if (data.track_key) {
+          nowEl.textContent = `${data.track_key}${data.file_name ? ' — ' + data.file_name : ''}`;
+        } else if (data.playlist) {
+          nowEl.textContent = '(no track)';
+        } else {
+          nowEl.textContent = '(unknown)';
+        }
+      }).catch(err => {
+        console.warn('nowplaying fetch error', err);
+      });
+    }
+
+    nowTimer = setInterval(fetchNowPlaying, 5000);
+    // fetch immediately
+    fetchNowPlaying();
   </script>
 </body>
 </html>

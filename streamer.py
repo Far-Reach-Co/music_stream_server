@@ -6,7 +6,7 @@ import subprocess
 import logging
 
 from config import CHUNK_SIZE, IDLE_TIMEOUT
-from tracks import get_track_filename
+from tracks import get_track_filename, get_track_info
 from playlists import get_playlist
 from cloudfront import get_signed_url
 
@@ -22,6 +22,11 @@ class AudioStreamer:
         self.thread = threading.Thread(target=self._run, daemon=True)
 
         self.last_listener_time = time.time()
+        # Current playing track metadata (updated while streaming)
+        self.current_track_key = None
+        self.current_track_filename = None
+        self.current_track_title = None
+        self.current_track_album = None
 
     def start(self):
         if not self.thread.is_alive():
@@ -74,8 +79,20 @@ class AudioStreamer:
             random.shuffle(tracks)
 
             for track_key, track_filename in tracks:
+                # fetch metadata for this track
+                track_info = get_track_info(track_key)
+                title = track_info.get("title") if track_info else None
+                album = track_info.get("album") if track_info else None
+
+                # Update currently-playing metadata for listeners and API
+                self.current_track_key = track_key
+                self.current_track_filename = track_filename
+                self.current_track_title = title
+                self.current_track_album = album
                 track_url = get_signed_url(track_filename)
-                logger.info(f"Now playing: {track_key} ({track_filename})")
+                logger.info(
+                    f"Now playing: {track_key} ({track_filename}) - {title or ''}"
+                )
 
                 try:
                     proc = subprocess.Popen(
@@ -144,6 +161,11 @@ class AudioStreamer:
                                         pass
 
                 finally:
+                    # Clear current track state when finished or on error
+                    self.current_track_key = None
+                    self.current_track_filename = None
+                    self.current_track_title = None
+                    self.current_track_album = None
                     if proc.poll() is None:
                         proc.kill()
                     if proc.stdout:

@@ -382,6 +382,28 @@ class RadioWebService:
                 logger.exception("[Stream] Unhandled exception")
                 return Response(content=str(e), status_code=500)
 
+        @self.app.get("/nowplaying")
+        @limiter.limit("30/minute")
+        def now_playing(request: Request):
+            channel_name = request.query_params.get("channel", "").strip()
+            valid, result = self._validate_channel_name(channel_name)
+            if not valid:
+                return Response(content=result, status_code=400)
+
+            channel = self._get_channel(result)
+            playlist = channel.current_playlist
+            if not playlist or playlist not in self.streamers:
+                return {"playlist": playlist, "track_key": None, "file_name": None}
+
+            streamer = self.streamers[playlist]
+            return {
+                "playlist": playlist,
+                "track_key": getattr(streamer, "current_track_key", None),
+                "file_name": getattr(streamer, "current_track_filename", None),
+                "track_title": getattr(streamer, "current_track_title", None),
+                "album": getattr(streamer, "current_track_album", None),
+            }
+
 
 # === Signal Handler for Data Reload ===
 def _handle_sighup(signum, frame):

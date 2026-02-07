@@ -33,6 +33,8 @@ from config import (
 from tracks import reload_tracks
 from playlists import get_playlist, get_all_playlists, reload_playlists
 from channel import Channel
+import os
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
@@ -181,7 +183,7 @@ class RadioWebService:
         @self.app.get("/")
         @limiter.limit("30/minute")
         def index(request: Request):
-            return FileResponse("static/index.html")
+            return self._render_file_with_footer("static/index.html")
 
         @self.app.get("/listen")
         @limiter.limit("30/minute")
@@ -191,8 +193,8 @@ class RadioWebService:
             if not valid:
                 return Response(result, status_code=400)
 
-            # auto-create listener page with dynamic JS if needed
-            return FileResponse("static/listener.html")
+            # serve listener page with server-side footer injection
+            return self._render_file_with_footer("static/listener.html")
 
         @self.app.get("/host")
         @limiter.limit("20/minute")
@@ -200,7 +202,31 @@ class RadioWebService:
             request: Request,
             _: None = Depends(self.login_required),
         ):
-            return FileResponse("static/host.html")
+            return self._render_file_with_footer("static/host.html")
+
+        # Helper to load an HTML file and inject the footer snippet server-side
+    def _render_file_with_footer(self, relpath: str):
+        try:
+            base = Path(__file__).parent
+            file_path = base / relpath
+            footer_path = base / "static" / "footer.html"
+            if not file_path.exists():
+                return FileResponse(relpath)
+
+            html = file_path.read_text(encoding="utf-8")
+            footer_html = footer_path.read_text(encoding="utf-8") if footer_path.exists() else ""
+
+            # Replace placeholder div if present, else append before </body>
+            placeholder = '<div id="site-footer" aria-hidden="true"></div>'
+            if placeholder in html:
+                html = html.replace(placeholder, footer_html)
+            else:
+                html = html.replace("</body>", footer_html + "</body>")
+
+            return Response(content=html, media_type="text/html")
+        except Exception as e:
+            logger.exception("[Render] Error injecting footer")
+            return FileResponse(relpath)
 
         @self.app.get("/admin")
         @limiter.limit("20/minute")

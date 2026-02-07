@@ -247,3 +247,46 @@ input[type="range"]::-moz-range-thumb:hover {
 .channel-actions a:hover {
   background-color: var(--green2);
 }
+
+/* Footer styles (shared snippet loaded into pages) */
+.site-footer {
+  margin-top: 2.5rem;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));
+  border-radius: 8px;
+  max-width: 680px;
+  margin-left: auto;
+  margin-right: auto;
+  color: var(--main-white);
+  font-size: 0.95rem;
+}
+.site-footer-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.sfaudio-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--main-white);
+}
+.sfaudio-logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.03);
+  padding: 6px;
+}
+.sfaudio-text {
+  text-align: left;
+  line-height: 1;
+}
+.sfaudio-title { font-weight: 600; color: var(--bright-white); }
+.sfaudio-sub { font-size: 0.85rem; color: var(--main-gray); }
+.site-credit { font-size: 0.9rem; color: var(--main-gray); }
+.site-credit a { color: var(--link-blue); text-decoration: underline; }

@@ -4,12 +4,15 @@ import hmac
 import queue
 import re
 import signal
+import threading
 import urllib.parse
 import logging
 import psycopg2
+import psycopg2.pool
 import uvicorn
 
 from fastapi import FastAPI, Request, Response, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -30,8 +33,8 @@ from config import (
     DEV_MODE,
     DEV_USER_EMAIL,
 )
-from tracks import reload_tracks
-from playlists import get_playlist, get_all_playlists, get_free_playlists, is_pro_playlist, reload_playlists, reload_pro_playlists
+from tracks import reload_tracks, get_track_count
+from playlists import get_playlist, get_all_playlists, get_free_playlists, is_pro_playlist, reload_playlists, reload_pro_playlists, get_playlist_count
 from channel import Channel
 import os
 from pathlib import Path
@@ -40,7 +43,6 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
 )
 logger = logging.getLogger("radio")
-logger.level = logging.INFO
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -55,18 +57,37 @@ async def rate_limit_handler(request: Request, exc: Exception):
 
 class RadioWebService:
     MAX_CHANNEL_NAME_LENGTH = 256
+    ALLOWED_COMMANDS = {"stop", "next"}
 
     def __init__(self):
         self.app = FastAPI()
         self.channels = {}
         self.streamers = {}
+        self._lock = threading.Lock()
+        self.db_pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=2, maxconn=10, dsn=SESSION_DB_DSN
+        )
+        logger.info("[DB] Connection pool initialized (min=2, max=10)")
         self.app.state.limiter = limiter
         self.app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["https://farreachco.com"],
+            allow_methods=["GET", "POST"],
+            allow_headers=["*"],
+            allow_credentials=True,
+        )
         self.app.add_middleware(
             BaseHTTPMiddleware, dispatch=self.create_session_middleware()
         )
         self.app.mount("/static", StaticFiles(directory="static"), name="static")
         self._define_routes()
+
+        @self.app.on_event("shutdown")
+        def shutdown_db_pool():
+            if self.db_pool:
+                self.db_pool.closeall()
+                logger.info("[DB] Connection pool closed")
 
     def _validate_channel_name(self, name: str) -> tuple[bool, str]:
         """Validate channel name format and length."""
@@ -84,44 +105,49 @@ class RadioWebService:
         return True, name
 
     def _get_channel(self, name: str) -> Channel:
-        if name not in self.channels:
-            logger.info(f"[Channel] Creating new channel: {name}")
-            self.channels[name] = Channel(name)
-        return self.channels[name]
+        with self._lock:
+            if name not in self.channels:
+                logger.info(f"[Channel] Creating new channel: {name}")
+                self.channels[name] = Channel(name)
+            return self.channels[name]
 
     def create_session_middleware(self):
         async def session_middleware(request: Request, call_next):
             cookie = request.cookies.get(SESSION_COOKIE_NAME)
             if not cookie:
-                logger.info("[Session] No session cookie")
+                logger.debug(f"[Session] No session cookie for {request.url.path}")
                 return await call_next(request)
 
             valid, session_id = self.verify_express_cookie(cookie, SESSION_SECRET)
             if not valid:
-                logger.info("[Session] Invalid signature")
+                logger.warning(f"[Session] Invalid signature for {request.url.path}")
                 return await call_next(request)
 
+            conn = None
             try:
-                with psycopg2.connect(SESSION_DB_DSN) as conn:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "SELECT sess FROM session WHERE sid = %s AND expire > NOW()",
-                            (session_id,),
-                        )
-                        row = cur.fetchone()
-                        if not row:
-                            logger.info("[Session] Session expired or not found")
-                            return await call_next(request)
+                conn = self.db_pool.getconn()
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT sess FROM session WHERE sid = %s AND expire > NOW()",
+                        (session_id,),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        logger.info("[Session] Session expired or not found")
+                        return await call_next(request)
 
-                        session_data = row[0]
-                        request.state.session_data = session_data
-                        request.state.user_id = session_data.get("user")
+                    session_data = row[0]
+                    request.state.session_data = session_data
+                    request.state.user_id = session_data.get("user")
             except psycopg2.OperationalError as e:
                 logger.warning(f"[Session] DB connection error: {e}")
             except psycopg2.ProgrammingError as e:
                 logger.error(f"[Session] DB query error: {e}")
             except Exception as e:
                 logger.error(f"[Session] Unexpected error: {e}", exc_info=True)
+            finally:
+                if conn:
+                    self.db_pool.putconn(conn)
 
             return await call_next(request)
 
@@ -181,18 +207,22 @@ class RadioWebService:
         user_id = getattr(request.state, "user_id", None)
         if not user_id:
             return False
+        conn = None
         try:
-            with psycopg2.connect(SESSION_DB_DSN) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        'SELECT is_pro FROM "public"."User" WHERE id = %s',
-                        (user_id,),
-                    )
-                    row = cur.fetchone()
-                    return bool(row and row[0])
+            conn = self.db_pool.getconn()
+            with conn.cursor() as cur:
+                cur.execute(
+                    'SELECT is_pro FROM "public"."User" WHERE id = %s',
+                    (user_id,),
+                )
+                row = cur.fetchone()
+                return bool(row and row[0])
         except psycopg2.Error as e:
             logger.error(f"[Pro] DB error checking pro status: {e}")
             return False
+        finally:
+            if conn:
+                self.db_pool.putconn(conn)
 
         # Helper to load an HTML file and inject the footer snippet server-side
     def _render_file_with_footer(self, relpath: str):
@@ -219,6 +249,15 @@ class RadioWebService:
             return FileResponse(relpath)
         
     def _define_routes(self):
+        @self.app.get("/health")
+        def health():
+            return {
+                "status": "ok",
+                "tracks_loaded": get_track_count(),
+                "playlists_loaded": get_playlist_count(),
+                "active_channels": len(self.channels),
+            }
+
         @self.app.get("/robots.txt")
         @limiter.limit("60/minute")
         def robots_txt(request: Request):
@@ -262,20 +301,26 @@ class RadioWebService:
                 if not user_id:
                     raise HTTPException(status_code=401, detail="Unauthorized")
 
+                conn = None
                 try:
-                    with psycopg2.connect(SESSION_DB_DSN) as conn:
-                        with conn.cursor() as cur:
-                            cur.execute(
-                                'SELECT email FROM "public"."User" WHERE id = %s',
-                                (user_id,),
-                            )
-                            row = cur.fetchone()
-                            if not row:
-                                raise HTTPException(status_code=404, detail="User not found")
-                            user_email = row[0]
+                    conn = self.db_pool.getconn()
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            'SELECT email FROM "public"."User" WHERE id = %s',
+                            (user_id,),
+                        )
+                        row = cur.fetchone()
+                        if not row:
+                            raise HTTPException(status_code=404, detail="User not found")
+                        user_email = row[0]
+                except HTTPException:
+                    raise
                 except psycopg2.Error as e:
                     logger.error(f"[Admin] DB error: {e}")
                     raise HTTPException(status_code=500, detail="Database error")
+                finally:
+                    if conn:
+                        self.db_pool.putconn(conn)
 
             if user_email not in ADMIN_EMAILS:
                 raise HTTPException(status_code=403, detail="Forbidden")
@@ -305,29 +350,35 @@ class RadioWebService:
             else:
                 user_id = getattr(request.state, "user_id", None)
                 if not user_id:
-                    return {"error": "Unauthorized"}, 401
+                    raise HTTPException(status_code=401, detail="Unauthorized")
 
                 # Query users table for email
+                conn = None
                 try:
-                    with psycopg2.connect(SESSION_DB_DSN) as conn:
-                        with conn.cursor() as cur:
-                            cur.execute(
-                                'SELECT email FROM "public"."User" WHERE id = %s',
-                                (user_id,),
-                            )
-                            row = cur.fetchone()
-                            if not row:
-                                logger.warning(f"[Admin] User {user_id} not found in users table")
-                                return {"error": "User not found"}, 404
-                            user_email = row[0]
+                    conn = self.db_pool.getconn()
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            'SELECT email FROM "public"."User" WHERE id = %s',
+                            (user_id,),
+                        )
+                        row = cur.fetchone()
+                        if not row:
+                            logger.warning(f"[Admin] User {user_id} not found in users table")
+                            raise HTTPException(status_code=404, detail="User not found")
+                        user_email = row[0]
+                except HTTPException:
+                    raise
                 except Exception as e:
                     logger.error(f"[Admin] DB error looking up user email: {e}")
-                    return {"error": "Database error"}, 500
+                    raise HTTPException(status_code=500, detail="Database error")
+                finally:
+                    if conn:
+                        self.db_pool.putconn(conn)
 
             # Check if email is in admin whitelist
             if user_email not in ADMIN_EMAILS:
                 logger.warning(f"[Admin] Unauthorized reload attempt by {user_email}")
-                return {"error": "Forbidden"}, 403
+                raise HTTPException(status_code=403, detail="Forbidden")
 
             # Reload both tracks and playlists
             logger.info(f"[Admin] Reload triggered by {user_email}")
@@ -347,10 +398,10 @@ class RadioWebService:
                 data = await request.json()
             except Exception as e:
                 logger.warning(f"[Command] Invalid JSON: {e}")
-                return {"error": "Invalid JSON"}, 400
+                raise HTTPException(status_code=400, detail="Invalid JSON")
 
             if not isinstance(data, dict):
-                return {"error": "Expected JSON object"}, 400
+                raise HTTPException(status_code=400, detail="Expected JSON object")
 
             cmd = data.get("command")
             channel_name = data.get("channel", "")
@@ -358,7 +409,7 @@ class RadioWebService:
 
             valid, result = self._validate_channel_name(channel_name)
             if not valid:
-                return {"error": result}, 400
+                raise HTTPException(status_code=400, detail=result)
 
             channel_name = result  # Use validated/normalized name
             try:
@@ -366,20 +417,24 @@ class RadioWebService:
                 if playlist_name:
                     # Validate playlist exists
                     if get_playlist(playlist_name) is None:
-                        return {"error": "Playlist not found"}, 400
+                        raise HTTPException(status_code=400, detail="Playlist not found")
 
                     if is_pro_playlist(playlist_name) and not self._get_user_is_pro(request):
                         raise HTTPException(status_code=403, detail="Pro subscription required")
 
                     channel.play_playlist(playlist_name, self.streamers)
                 elif cmd:
+                    if cmd not in self.ALLOWED_COMMANDS:
+                        raise HTTPException(status_code=400, detail=f"Unknown command: {cmd}")
                     channel.send_command(cmd, self.streamers)
                 else:
-                    return {"error": "Missing command or playlist"}, 400
+                    raise HTTPException(status_code=400, detail="Missing command or playlist")
                 return {"status": "ok", "channel": channel_name}
+            except HTTPException:
+                raise
             except Exception as e:
-                logger.error(f"[Command] Error: {e}")
-                return {"error": str(e)}, 500
+                logger.error(f"[Command] Error: {e}", exc_info=True)
+                raise HTTPException(status_code=500, detail="Internal server error")
 
         @self.app.get("/stream")
         @limiter.limit("10/minute")
@@ -415,14 +470,18 @@ class RadioWebService:
                                 chunk = SILENT_BUFFER
                             yield chunk
                     finally:
-                        self.streamers[playlist].remove_listener(channel_name, q)
-                        if not self.streamers[playlist].listener_queues.get(
-                            channel_name
-                        ):
-                            logger.info(
-                                f"[Channel] No more listeners on '{channel_name}', removing channel"
-                            )
-                            del self.channels[channel_name]
+                        try:
+                            self.streamers[playlist].remove_listener(channel_name, q)
+                            if not self.streamers[playlist].listener_queues.get(
+                                channel_name
+                            ):
+                                with self._lock:
+                                    logger.info(
+                                        f"[Channel] No more listeners on '{channel_name}', removing channel"
+                                    )
+                                    self.channels.pop(channel_name, None)
+                        except KeyError:
+                            logger.warning(f"[Stream] Cleanup: streamer or channel already removed for '{channel_name}'")
 
                 return StreamingResponse(
                     generate(),
@@ -472,11 +531,14 @@ signal.signal(signal.SIGHUP, _handle_sighup)
 # === Main Entrypoint ===
 if __name__ == "__main__":
     # Load tracks and playlists on startup
-    logger.info("Loading tracks and playlists...")
+    logger.info("[Startup] Loading tracks and playlists...")
     reload_tracks()
     reload_playlists()
     reload_pro_playlists()
 
     service = RadioWebService()
-    logger.info(f"Server running at http://{HOST}:{PORT}")
+    logger.info(
+        f"[Startup] Ready — {get_track_count()} tracks, {get_playlist_count()} playlists, "
+        f"DEV_MODE={DEV_MODE}, host={HOST}:{PORT}"
+    )
     uvicorn.run(service.app, host=HOST, port=PORT)

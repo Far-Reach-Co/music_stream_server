@@ -66,8 +66,11 @@ def get_all_track_keys() -> list[str]:
     return list(_tracks.keys())
 
 
+def get_track_count() -> int:
+    """Get the number of loaded tracks."""
+    return len(_tracks)
+
+
 def reload_tracks():
     """Force reload tracks from CSV."""
-    global _tracks
-    _tracks = {}
     _load_tracks()

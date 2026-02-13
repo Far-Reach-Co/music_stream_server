@@ -17,6 +17,9 @@ TRACKS_CSV_PATH = os.getenv("TRACKS_CSV_PATH", "tracks.csv")
 # Playlist registry (Google Sheets URL or local CSV path)
 PLAYLISTS_CSV_PATH = os.getenv("PLAYLISTS_CSV_PATH", "playlists.csv")
 
+# Pro playlists registry (Google Sheets URL or local CSV path)
+PRO_PLAYLISTS_CSV_PATH = os.getenv("PRO_PLAYLISTS_CSV_PATH", "pro_playlists.csv")
+
 # Admin whitelist for reload endpoint (comma-separated emails)
 ADMIN_EMAILS = [e.strip() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()]
 

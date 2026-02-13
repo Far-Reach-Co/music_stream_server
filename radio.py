@@ -194,10 +194,12 @@ class RadioWebService:
             request.state.dev_mode = True
             return
         if not getattr(request.state, "user_id", None):
+            redirect_url = str(request.url)
+            login_target = f"{LOGIN_URL}?redirect={urllib.parse.quote(redirect_url, safe='')}"
             raise HTTPException(
                 status_code=307,
                 detail="Redirecting to login",
-                headers={"Location": LOGIN_URL},
+                headers={"Location": login_target},
             )
 
     def _get_user_is_pro(self, request: Request) -> bool:

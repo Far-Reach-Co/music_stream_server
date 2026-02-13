@@ -47,6 +47,10 @@
 
     <p id="status" style="margin-top: 20px; color: var(--green)"></p>
 
+    <hr style="margin-top: 30px; border-color: #333;" />
+    <p><strong>Current Playlist:</strong> <span id="current-playlist">(none)</span></p>
+    <p><strong>Now Playing:</strong> <span id="now-playing">(nothing)</span></p>
+
     <script>
       const statusEl = document.getElementById("status");
       const playlistSelect = document.getElementById("playlist-select");
@@ -148,7 +152,21 @@
         }
       }
 
+      async function pollNowPlaying() {
+        if (!CHANNEL) return;
+        try {
+          const res = await fetch(`/nowplaying?channel=${encodeURIComponent(CHANNEL)}`);
+          const data = await res.json();
+          document.getElementById("current-playlist").textContent = data.playlist || "(none)";
+          document.getElementById("now-playing").textContent = data.track_title || "(nothing)";
+        } catch (err) {
+          console.error("Failed to fetch now playing:", err);
+        }
+      }
+
       fetchPlaylists();
+      pollNowPlaying();
+      setInterval(pollNowPlaying, 5000);
     </script>
     <div id="site-footer" aria-hidden="true"><!-- footer injected server-side --></div>
     </body>

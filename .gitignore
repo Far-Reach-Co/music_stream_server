@@ -5,3 +5,4 @@ __pycache__
 .env
 notes
 private_frc_cloudfront_key.pem
+docs/

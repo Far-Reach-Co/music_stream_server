@@ -31,7 +31,7 @@ from config import (
     DEV_USER_EMAIL,
 )
 from tracks import reload_tracks
-from playlists import get_playlist, get_all_playlists, reload_playlists
+from playlists import get_playlist, get_all_playlists, get_free_playlists, is_pro_playlist, reload_playlists, reload_pro_playlists
 from channel import Channel
 import os
 from pathlib import Path
@@ -173,6 +173,27 @@ class RadioWebService:
                 detail="Redirecting to login",
                 headers={"Location": LOGIN_URL},
             )
+
+    def _get_user_is_pro(self, request: Request) -> bool:
+        """Check if the current user has pro status."""
+        if DEV_MODE:
+            return True
+        user_id = getattr(request.state, "user_id", None)
+        if not user_id:
+            return False
+        try:
+            with psycopg2.connect(SESSION_DB_DSN) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        'SELECT is_pro FROM "public"."User" WHERE id = %s',
+                        (user_id,),
+                    )
+                    row = cur.fetchone()
+                    return bool(row and row[0])
+        except psycopg2.Error as e:
+            logger.error(f"[Pro] DB error checking pro status: {e}")
+            return False
+
         # Helper to load an HTML file and inject the footer snippet server-side
     def _render_file_with_footer(self, relpath: str):
         try:
@@ -267,7 +288,9 @@ class RadioWebService:
             request: Request,
             _: None = Depends(self.login_required),
         ):
-            return {"playlists": get_all_playlists()}
+            if self._get_user_is_pro(request):
+                return {"playlists": get_all_playlists()}
+            return {"playlists": get_free_playlists()}
 
         @self.app.post("/admin/reload")
         @limiter.limit("5/minute")
@@ -310,8 +333,9 @@ class RadioWebService:
             logger.info(f"[Admin] Reload triggered by {user_email}")
             reload_tracks()
             reload_playlists()
+            reload_pro_playlists()
 
-            return {"status": "ok", "message": "Tracks and playlists reloaded"}
+            return {"status": "ok", "message": "Tracks, playlists, and pro playlists reloaded"}
 
         @self.app.post("/command")
         @limiter.limit("60/minute")
@@ -343,6 +367,9 @@ class RadioWebService:
                     # Validate playlist exists
                     if get_playlist(playlist_name) is None:
                         return {"error": "Playlist not found"}, 400
+
+                    if is_pro_playlist(playlist_name) and not self._get_user_is_pro(request):
+                        raise HTTPException(status_code=403, detail="Pro subscription required")
 
                     channel.play_playlist(playlist_name, self.streamers)
                 elif cmd:
@@ -436,6 +463,7 @@ def _handle_sighup(signum, frame):
     logger.info("[Signal] Received SIGHUP, reloading tracks and playlists...")
     reload_tracks()
     reload_playlists()
+    reload_pro_playlists()
 
 
 signal.signal(signal.SIGHUP, _handle_sighup)
@@ -447,6 +475,7 @@ if __name__ == "__main__":
     logger.info("Loading tracks and playlists...")
     reload_tracks()
     reload_playlists()
+    reload_pro_playlists()
 
     service = RadioWebService()
     logger.info(f"Server running at http://{HOST}:{PORT}")

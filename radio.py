@@ -13,7 +13,7 @@ import uvicorn
 
 from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter
@@ -55,6 +55,11 @@ async def rate_limit_handler(request: Request, exc: Exception):
     )
 
 
+class LoginRedirectException(Exception):
+    def __init__(self, redirect_url: str):
+        self.redirect_url = redirect_url
+
+
 class RadioWebService:
     MAX_CHANNEL_NAME_LENGTH = 256
     ALLOWED_COMMANDS = {"stop", "next"}
@@ -70,6 +75,10 @@ class RadioWebService:
         logger.info("[DB] Connection pool initialized (min=2, max=10)")
         self.app.state.limiter = limiter
         self.app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+        self.app.add_exception_handler(
+            LoginRedirectException,
+            lambda req, exc: RedirectResponse(url=exc.redirect_url, status_code=307),
+        )
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=["https://farreachco.com"],
@@ -196,11 +205,7 @@ class RadioWebService:
         if not getattr(request.state, "user_id", None):
             redirect_url = str(request.url)
             login_target = f"{LOGIN_URL}?redirect={urllib.parse.quote(redirect_url, safe='')}"
-            raise HTTPException(
-                status_code=307,
-                detail="Redirecting to login",
-                headers={"Location": login_target},
-            )
+            raise LoginRedirectException(login_target)
 
     def _get_user_is_pro(self, request: Request) -> bool:
         """Check if the current user has pro status."""

@@ -56,10 +56,16 @@ class AudioStreamer:
         self.command_queue.put(cmd)
 
     def _run(self):
+        try:
+            self._run_loop()
+        except Exception:
+            logger.exception(f"[Streamer] Fatal error in streamer for playlist '{self.playlist_name}'")
+
+    def _run_loop(self):
         while True:
             track_keys = get_playlist(self.playlist_name)
             if not track_keys:
-                logger.warning(f"[!] Playlist '{self.playlist_name}' not found or empty.")
+                logger.warning(f"[Streamer] Playlist '{self.playlist_name}' not found or empty.")
                 time.sleep(5)
                 continue
 
@@ -69,10 +75,10 @@ class AudioStreamer:
                 if filename:
                     tracks.append((key, filename))
                 else:
-                    logger.warning(f"[!] Track key '{key}' not found in registry.")
+                    logger.warning(f"[Streamer] Track key '{key}' not found in registry.")
 
             if not tracks:
-                logger.warning("[!] No valid tracks found. Waiting...")
+                logger.warning(f"[Streamer] No valid tracks found for playlist '{self.playlist_name}'. Waiting...")
                 time.sleep(5)
                 continue
 
@@ -110,7 +116,7 @@ class AudioStreamer:
                             "-",
                         ],
                         stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
                     )
                 except FileNotFoundError:
                     logger.error("FFmpeg not found in PATH")
@@ -145,7 +151,9 @@ class AudioStreamer:
                             return
 
                         # --- audio read ---
-                        assert proc.stdout is not None
+                        if proc.stdout is None:
+                            logger.error("[Streamer] FFmpeg stdout is None, skipping track")
+                            break
                         chunk = proc.stdout.read(CHUNK_SIZE)
 
                         if not chunk:
@@ -171,3 +179,5 @@ class AudioStreamer:
                     if proc.stdout:
                         proc.stdout.close()
                     proc.wait()
+                    if proc.returncode and proc.returncode != 0:
+                        logger.warning(f"[Streamer] FFmpeg exited with code {proc.returncode} for track '{track_key}'")

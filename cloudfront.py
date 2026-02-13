@@ -27,15 +27,20 @@ def _get_private_key():
     if _private_key is None:
         with open(CLOUDFRONT_PRIVATE_KEY_PATH, "rb") as f:
             _private_key = load_pem_private_key(f.read(), password=None)
-        logger.info("Loaded CloudFront private key")
+        logger.info("[CloudFront] Loaded private key")
     return _private_key
 
 
 def _get_redis_client():
     global _redis_client
     if _redis_client is None:
-        _redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-        logger.info("Initialized Redis client for URL caching")
+        try:
+            _redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+            _redis_client.ping()
+            logger.info("[CloudFront] Redis client connected for URL caching")
+        except Exception as e:
+            logger.warning(f"[CloudFront] Redis unavailable, signed URLs will not be cached: {e}")
+            _redis_client = None
     return _redis_client
 
 
@@ -78,35 +83,36 @@ def get_signed_url(filename: str, expires_days: int = 3) -> str:
     now = int(datetime.now(timezone.utc).timestamp())
 
     # Try to get from cache
-    try:
-        client = _get_redis_client()
-        cached = client.get(cache_key)
-        if cached:
-            data = json.loads(cached)
-            expires_at = data["expires_at"]
-            # Return cached URL if it has more than 1 hour left
-            if expires_at - now > BUFFER_SECONDS:
-                logger.debug(f"Cache hit for {filename}")
-                return data["url"]
-            logger.debug(f"Cache expired (within buffer) for {filename}")
-    except Exception as e:
-        logger.warning(f"Redis error, falling back to fresh URL: {e}")
-        # Fall through to generate fresh URL
-        signed_url, _ = _generate_signed_url(filename, expires_days)
-        return signed_url
+    client = _get_redis_client()
+    if client:
+        try:
+            cached = client.get(cache_key)
+            if cached:
+                data = json.loads(cached)
+                expires_at = data["expires_at"]
+                # Return cached URL if it has more than 1 hour left
+                if expires_at - now > BUFFER_SECONDS:
+                    logger.debug(f"[CloudFront] Cache hit for {filename}")
+                    return data["url"]
+                logger.debug(f"[CloudFront] Cache expired (within buffer) for {filename}")
+        except Exception as e:
+            logger.warning(f"[CloudFront] Redis read error, falling back to fresh URL: {e}")
+            signed_url, _ = _generate_signed_url(filename, expires_days)
+            return signed_url
 
     # Generate new URL and cache it
     signed_url, expires_at = _generate_signed_url(filename, expires_days)
 
-    try:
-        ttl_seconds = expires_at - now
-        client.set(
-            cache_key,
-            json.dumps({"url": signed_url, "expires_at": expires_at}),
-            ex=ttl_seconds,
-        )
-        logger.debug(f"Cached signed URL for {filename}, TTL={ttl_seconds}s")
-    except Exception as e:
-        logger.warning(f"Failed to cache URL: {e}")
+    if client:
+        try:
+            ttl_seconds = expires_at - now
+            client.set(
+                cache_key,
+                json.dumps({"url": signed_url, "expires_at": expires_at}),
+                ex=ttl_seconds,
+            )
+            logger.debug(f"[CloudFront] Cached signed URL for {filename}, TTL={ttl_seconds}s")
+        except Exception as e:
+            logger.warning(f"[CloudFront] Failed to cache URL: {e}")
 
     return signed_url

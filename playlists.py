@@ -88,8 +88,6 @@ def is_pro_playlist(name: str) -> bool:
 
 def reload_pro_playlists():
     """Force reload pro playlists from CSV."""
-    global _pro_playlists
-    _pro_playlists = None
     _load_pro_playlists()
 
 
@@ -116,8 +114,11 @@ def get_free_playlists() -> list[str]:
     return [name for name in _playlists if name not in _pro_playlists]
 
 
+def get_playlist_count() -> int:
+    """Get the number of loaded playlists."""
+    return len(_playlists)
+
+
 def reload_playlists():
     """Force reload playlists from CSV."""
-    global _playlists
-    _playlists = {}
     _load_playlists()

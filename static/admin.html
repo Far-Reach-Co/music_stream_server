@@ -15,14 +15,17 @@
     <link rel="stylesheet" href="static/style.css" />
   </head>
   <body>
-    <h1>FRC Radio – Admin Panel</h1>
+    <h1 class="fade-in">Admin Panel</h1>
+    <p class="subtitle fade-in">System management</p>
 
-    <h4>Reload Data</h4>
-    <p style="font-size: 0.9em; color: #888; margin-bottom: 20px;">
-      Reload tracks and playlists from Google Sheets
-    </p>
-    <button id="reload-btn" onclick="reloadData()">Reload Tracks & Playlists</button>
-    <p id="status" style="margin-top: 20px;"></p>
+    <div class="card fade-in">
+      <div class="card-header">Reload Data</div>
+      <p style="font-size: 0.88rem; color: var(--light-gray); margin-bottom: 18px;">
+        Reload tracks, playlists, and pro playlists from Google Sheets.
+      </p>
+      <button class="primary" id="reload-btn" onclick="reloadData()">Reload All Data</button>
+      <p id="status" class="status-msg"></p>
+    </div>
 
     <script>
       async function reloadData() {
@@ -30,7 +33,8 @@
         const btn = document.getElementById("reload-btn");
 
         btn.disabled = true;
-        status.style.color = "#888";
+        status.className = "status-msg";
+        status.style.color = "var(--light-gray)";
         status.textContent = "Reloading...";
 
         try {
@@ -41,14 +45,14 @@
 
           const data = await res.json();
           if (res.ok) {
-            status.style.color = "var(--green)";
+            status.className = "status-msg success";
             status.textContent = data.message;
           } else {
-            status.style.color = "var(--red1)";
+            status.className = "status-msg error";
             status.textContent = data.error || "Reload failed";
           }
         } catch (err) {
-          status.style.color = "var(--red1)";
+          status.className = "status-msg error";
           status.textContent = "Reload request failed.";
           console.error(err);
         } finally {

@@ -11,45 +11,37 @@
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FRC Radio – Host Control</title>
+    <title>FRC Radio – Host</title>
     <link rel="stylesheet" href="static/style.css" />
   </head>
   <body>
-    <h1>FRC Radio – Host Control Panel</h1>
+    <h1 class="fade-in">Host Control Panel</h1>
+    <p class="subtitle fade-in">Channel: <strong id="channel-display" style="color: var(--blue6);"></strong></p>
 
-    <!-- <p><strong>Managing Channel:</strong> <span id="channel-name"></span></p> -->
-    <p>
-      <strong>Listener Link:</strong>
-      <input
-        id="listener-link"
-        type="text"
-        readonly
-        style="width: 100%; max-width: 400px"
-      />
-    </p>
-    <br>
-    <button style="height: 40px;" onclick="copyListenerLink()">📋 Copy Link</button>
-    <br>
-    <!-- <br>
-    <h3>Commands</h3>
-    <div>
-      <button onclick="sendCommand('next')">⏭️ Next Track</button>
-    </div> -->
+    <div class="card fade-in">
+      <div class="card-header">Listener Link</div>
+      <div class="link-field">
+        <input id="listener-link" type="text" readonly />
+        <button onclick="copyListenerLink()">Copy</button>
+      </div>
+    </div>
 
-    <br />
-    <h4>Select Music:</h4>
-    <label for="playlist-select">Playlist:</label>
-    <select id="playlist-select">
-      <option disabled selected>Select Playlist</option>
-    </select>
-    <br />
-    <button onclick="changePlaylist()">🎵 Start Playlist</button>
+    <div class="card fade-in">
+      <div class="card-header">Select Music</div>
+      <select id="playlist-select">
+        <option disabled selected>Select Playlist</option>
+      </select>
+      <button class="primary" onclick="changePlaylist()">Start Playlist</button>
+      <p id="status" class="status-msg"></p>
+    </div>
 
-    <p id="status" style="margin-top: 20px; color: var(--green)"></p>
-
-    <hr style="margin-top: 30px; border-color: #333;" />
-    <p><strong>Current Playlist:</strong> <span id="current-playlist">(none)</span></p>
-    <p><strong>Now Playing:</strong> <span id="now-playing">(nothing)</span></p>
+    <div class="now-playing-bar fade-in" id="np-section">
+      <div class="label">Current Playlist</div>
+      <div class="value" id="current-playlist">(none)</div>
+      <hr class="np-divider" />
+      <div class="label">Now Playing</div>
+      <div class="track-value" id="now-playing">(nothing)</div>
+    </div>
 
     <script>
       const statusEl = document.getElementById("status");
@@ -59,24 +51,23 @@
       const CHANNEL = urlParams.get("channel");
 
       if (!CHANNEL) {
-        alert(
-          "Missing channel name in URL. Please use ?channel=<channel name>"
-        );
+        alert("Missing channel name in URL. Please use ?channel=<channel name>");
       }
 
+      document.getElementById("channel-display").textContent = CHANNEL || "(none)";
+
       if (CHANNEL) {
-        const link = `${
-          window.location.origin
-        }/listen?channel=${encodeURIComponent(CHANNEL)}`;
+        const link = `${window.location.origin}/listen?channel=${encodeURIComponent(CHANNEL)}`;
         document.getElementById("listener-link").value = link;
       }
 
       function copyListenerLink() {
         const input = document.getElementById("listener-link");
         input.select();
-        input.setSelectionRange(0, 99999); // For mobile
+        input.setSelectionRange(0, 99999);
         document.execCommand("copy");
-        statusEl.textContent = "📋 Link copied to clipboard.";
+        statusEl.className = "status-msg success";
+        statusEl.textContent = "Link copied to clipboard";
       }
 
       async function fetchPlaylists() {
@@ -84,7 +75,15 @@
           const res = await fetch("/playlists");
           const data = await res.json();
 
-          playlistSelect.innerHTML = "<option disabled selected>Select Playlist</option>";
+          // Clear existing options safely
+          while (playlistSelect.options.length > 0) {
+            playlistSelect.remove(0);
+          }
+          const defaultOpt = document.createElement("option");
+          defaultOpt.disabled = true;
+          defaultOpt.selected = true;
+          defaultOpt.textContent = "Select Playlist";
+          playlistSelect.appendChild(defaultOpt);
 
           data.playlists.sort().forEach((playlist) => {
             const option = document.createElement("option");
@@ -93,61 +92,61 @@
             playlistSelect.appendChild(option);
           });
         } catch (err) {
-          statusEl.textContent = "❌ Failed to fetch playlists.";
+          statusEl.className = "status-msg error";
+          statusEl.textContent = "Failed to fetch playlists.";
           console.error(err);
         }
       }
 
       async function sendCommand(cmd) {
         if (!CHANNEL) return;
-
         try {
           const res = await fetch("/command", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ channel: CHANNEL, command: cmd }),
           });
-
           const data = await res.json();
           if (res.ok) {
-            statusEl.textContent = `✅ Sent command: ${data.channel} → ${cmd}`;
+            statusEl.className = "status-msg success";
+            statusEl.textContent = `Sent: ${data.channel} \u2192 ${cmd}`;
           } else {
-            statusEl.textContent = `❌ Error: ${data.error}`;
+            statusEl.className = "status-msg error";
+            statusEl.textContent = `Error: ${data.error}`;
           }
         } catch (err) {
-          statusEl.textContent = "❌ Command failed.";
+          statusEl.className = "status-msg error";
+          statusEl.textContent = "Command failed.";
           console.error(err);
         }
       }
 
       async function changePlaylist() {
         if (!CHANNEL) return;
-
         const playlist = playlistSelect.value;
-
         if (!playlist || playlist === "Select Playlist") {
-          statusEl.textContent = "❌ No playlist selected.";
+          statusEl.className = "status-msg error";
+          statusEl.textContent = "No playlist selected.";
           return;
         }
-
         try {
           const res = await fetch("/command", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              channel: CHANNEL,
-              playlist: playlist,
-            }),
+            body: JSON.stringify({ channel: CHANNEL, playlist: playlist }),
           });
-
           const data = await res.json();
           if (res.ok) {
-            statusEl.textContent = `✅ Channel "${data.channel}" now playing "${playlist}"`;
+            statusEl.className = "status-msg success";
+            statusEl.textContent = `Now playing "${playlist}"`;
+            pollNowPlaying();
           } else {
-            statusEl.textContent = `❌ ${data.error}`;
+            statusEl.className = "status-msg error";
+            statusEl.textContent = data.error || data.detail || "Failed";
           }
         } catch (err) {
-          statusEl.textContent = "❌ Playlist change failed.";
+          statusEl.className = "status-msg error";
+          statusEl.textContent = "Playlist change failed.";
           console.error(err);
         }
       }
@@ -168,6 +167,6 @@
       pollNowPlaying();
       setInterval(pollNowPlaying, 5000);
     </script>
-    <div id="site-footer" aria-hidden="true"><!-- footer injected server-side --></div>
-    </body>
-  </html>
+    <div id="site-footer" aria-hidden="true"></div>
+  </body>
+</html>

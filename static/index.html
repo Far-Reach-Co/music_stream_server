@@ -13,159 +13,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FRC Radio</title>
     <link rel="stylesheet" href="static/style.css" />
-    <style>
-      .section {
-        margin: 30px auto;
-        padding: 20px;
-        max-width: 500px;
-        text-align: left;
-      }
-      .section p {
-        margin: 10px 0;
-        line-height: 1.6;
-      }
-      .step {
-        margin: 15px 0;
-        padding-left: 10px;
-        border-left: 3px solid var(--green);
-      }
-      .step-number {
-        color: var(--green);
-        font-weight: bold;
-      }
-      #channel-input {
-        display: block;
-        margin: 15px auto;
-        width: 100%;
-        max-width: 300px;
-        height: var(--butt-tall);
-        font-family: YoungSerif;
-        font-size: 1.2rem;
-        text-align: center;
-        background-color: var(--blue3);
-        color: var(--bright-white);
-        border: 1px solid var(--blue5);
-        border-radius: 5px;
-        box-shadow: 0 0 5px var(--blue5);
-      }
-      #channel-input:focus {
-        outline: none;
-        border-color: var(--green);
-        box-shadow: 0 0 8px var(--green2);
-      }
-      #channel-input::placeholder {
-        color: var(--main-gray);
-      }
-      #error-msg {
-        color: var(--red1);
-        min-height: 1.5em;
-        margin: 10px 0;
-      }
-      .info-box {
-        background-color: rgba(161, 190, 128, 0.1);
-        border: 1px solid var(--green2);
-        border-radius: 8px;
-        padding: 15px;
-        margin: 20px auto;
-        max-width: 450px;
-      }
-      .info-box p {
-        font-size: 0.95rem;
-      }
-    </style>
   </head>
   <body>
-    <h1>FRC Radio</h1>
-    <p>On-demand music streaming for your group</p>
+    <h1 class="fade-in">FRC Radio</h1>
+    <p class="subtitle fade-in">On-demand music streaming for your group</p>
 
-    <div class="section">
-      <h3>How It Works</h3>
-
-      <div class="step">
-        <p><span class="step-number">1.</span> <strong>Create a Channel</strong></p>
-        <p>Enter a channel name below and click "Create Channel" to open your host control panel.</p>
-      </div>
-
-      <div class="step">
-        <p><span class="step-number">2.</span> <strong>Choose Music</strong></p>
-        <p>Select a playlist from the host panel to start streaming music to your channel.</p>
-      </div>
-
-      <div class="step">
-        <p><span class="step-number">3.</span> <strong>Share with Listeners</strong></p>
-        <p>Copy the listener link from your host panel and send it to your friends. They can open it in any browser to listen in sync.</p>
+    <div class="card fade-in">
+      <div class="card-header">How It Works</div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <strong>Create a Channel</strong>
+            <p>Enter a channel name below to open your host control panel.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <strong>Choose Music</strong>
+            <p>Select a playlist from the host panel to start streaming.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <strong>Share with Listeners</strong>
+            <p>Copy the listener link and send it out. Anyone can tune in from any browser.</p>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="section" style="text-align: center;">
-      <h3>Create Your Channel</h3>
+    <div class="card fade-in">
+      <div class="card-header">Create Your Channel</div>
       <input
         type="text"
         id="channel-input"
         placeholder="Enter channel name"
         maxlength="256"
         autocomplete="off"
+        style="width: 100%; max-width: 320px; height: var(--butt-tall); text-align: center; display: block; margin: 0 auto 12px;"
       />
-      <p id="error-msg"></p>
-      <button onclick="createChannel()">Create Channel</button>
+      <p id="error-msg" class="status-msg error" style="min-height: 1.4em;"></p>
+      <button class="primary" onclick="createChannel()">Create Channel</button>
     </div>
 
-    <div class="info-box">
-      <p><strong>Tip:</strong> Channel names can only contain letters, numbers, hyphens, and underscores. Spaces will be converted to hyphens automatically.</p>
+    <div class="info-box fade-in">
+      <p><strong>Tip:</strong> Channel names can contain letters, numbers, hyphens, and underscores. Spaces become hyphens automatically.</p>
     </div>
 
     <script>
       const input = document.getElementById("channel-input");
       const errorMsg = document.getElementById("error-msg");
 
-      // Allow Enter key to submit
       input.addEventListener("keypress", function(e) {
-        if (e.key === "Enter") {
-          createChannel();
-        }
+        if (e.key === "Enter") createChannel();
       });
 
       function formatChannelName(name) {
-        // Trim whitespace
         name = name.trim();
-        // Replace spaces with hyphens
         name = name.replace(/\s+/g, "-");
-        // Remove any characters that aren't alphanumeric, hyphen, or underscore
         name = name.replace(/[^a-zA-Z0-9_-]/g, "");
-        // Collapse multiple hyphens
         name = name.replace(/-+/g, "-");
-        // Remove leading/trailing hyphens
         name = name.replace(/^-+|-+$/g, "");
         return name;
       }
 
       function validateChannelName(name) {
-        if (!name) {
-          return "Please enter a channel name";
-        }
-        if (name.length > 256) {
-          return "Channel name is too long";
-        }
-        if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-          return "Channel name contains invalid characters";
-        }
+        if (!name) return "Please enter a channel name";
+        if (name.length > 256) return "Channel name is too long";
+        if (!/^[a-zA-Z0-9_-]+$/.test(name)) return "Channel name contains invalid characters";
         return null;
       }
 
       function createChannel() {
         const rawName = input.value;
         const channelName = formatChannelName(rawName);
-
         const error = validateChannelName(channelName);
         if (error) {
           errorMsg.textContent = error;
           return;
         }
-
         errorMsg.textContent = "";
         window.location.href = `/host?channel=${encodeURIComponent(channelName)}`;
       }
     </script>
-  <div id="site-footer" aria-hidden="true"><!-- footer injected server-side --></div>
+    <div id="site-footer" aria-hidden="true"></div>
   </body>
 </html>

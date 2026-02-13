@@ -15,20 +15,26 @@
   <link rel="stylesheet" href="static/style.css" />
 </head>
 <body>
-  <h1>FRC Radio – Listener</h1>
+  <h1 class="fade-in">FRC Radio</h1>
+  <p class="subtitle fade-in">Channel: <strong id="channel-name" style="color: var(--blue6);"></strong></p>
 
-  <button id="start-button">▶️ Start Listening</button><br /><br />
-  <p><strong>Listening Channel:</strong> <span id="channel-name"></span></p>
-  <p><strong>Now Playing:</strong> <span id="now-playing">(not playing)</span></p>
+  <div class="listener-hero fade-in">
+    <button class="play-button" id="start-button" aria-label="Start Listening">
+      <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+    </button>
+  </div>
 
-  <audio id="radio" preload="none" style="display: none"></audio><br />
+  <audio id="radio" preload="none" style="display: none"></audio>
 
-  <label for="volume">
-    <span class="volume-text">
-      🔉 Volume: <span id="volume-display">80%</span>
-    </span>
-    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" />
-  </label>
+  <div class="now-playing-bar fade-in" id="np-bar">
+    <div class="label">Now Playing</div>
+    <div class="track-value" id="now-playing">(not playing)</div>
+    <hr class="np-divider" />
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span class="volume-text" style="margin: 0; white-space: nowrap;">Vol: <span id="volume-display">80%</span></span>
+      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" style="width: 100%; margin: 0;" />
+    </div>
+  </div>
 
   <script>
     const button = document.getElementById("start-button");
@@ -40,15 +46,12 @@
     const channel = urlParams.get("channel");
     document.getElementById("channel-name").textContent = channel || "(none)";
 
-
     if (!channel) {
       alert("Missing channel in URL. Please use ?channel=alpha");
       button.disabled = true;
     }
 
     button.addEventListener("click", () => {
-      console.log("🎧 Connecting to channel:", channel);
-
       audio.pause();
       audio.src = "";
       audio.load();
@@ -61,23 +64,20 @@
 
       setTimeout(() => {
         audio.play().then(() => {
-          console.log("🎶 Playback started");
+          console.log("Playback started");
         }).catch((err) => {
-          console.error("❌ Playback error:", err);
+          console.error("Playback error:", err);
         });
       }, 500);
     });
 
     volumeSlider.addEventListener("input", () => {
       const volValue = parseFloat(volumeSlider.value);
-      const volPercent = Math.round(volValue * 100);
       audio.volume = volValue;
-      volumeDisplay.textContent = volPercent + "%";
+      volumeDisplay.textContent = Math.round(volValue * 100) + "%";
     });
 
-    // Poll /nowplaying to update currently playing track
     const nowEl = document.getElementById('now-playing');
-    let nowTimer = null;
     function fetchNowPlaying() {
       if (!channel) return;
       fetch('/nowplaying?channel=' + encodeURIComponent(channel)).then(r => r.json()).then(data => {
@@ -86,21 +86,20 @@
           return;
         }
         if (data.track_title) {
-          nowEl.textContent = `${data.track_title}${data.album ? ' — ' + data.album : ''}`;
+          nowEl.textContent = `${data.track_title}${data.album ? ' \u2014 ' + data.album : ''}`;
         } else if (data.track_key) {
-          nowEl.textContent = `${data.track_key}${data.file_name ? ' — ' + data.file_name : ''}`;
+          nowEl.textContent = `${data.track_key}${data.file_name ? ' \u2014 ' + data.file_name : ''}`;
         } else if (data.playlist) {
-          nowEl.textContent = '(no track)';
+          nowEl.textContent = '(waiting for track...)';
         } else {
-          nowEl.textContent = '(unknown)';
+          nowEl.textContent = '(not playing)';
         }
       }).catch(err => {
         console.warn('nowplaying fetch error', err);
       });
     }
 
-    nowTimer = setInterval(fetchNowPlaying, 5000);
-    // fetch immediately
+    setInterval(fetchNowPlaying, 5000);
     fetchNowPlaying();
   </script>
 </body>

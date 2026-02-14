@@ -196,12 +196,12 @@ button.primary:hover {
   font-family: 'DM Sans', sans-serif;
   font-size: 0.95rem;
   font-weight: 500;
-  background: linear-gradient(135deg, var(--blue3), var(--blue4));
+  background: var(--blue3);
   color: var(--blue6);
   border: 1px solid var(--blue5);
   border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-  transition: all 0.25s ease;
+  box-shadow: none;
+  transition: border-color 0.15s ease, color 0.15s ease;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -209,11 +209,27 @@ button.primary:hover {
   padding: 0 16px;
 }
 
-#category-select:hover,
-#playlist-select:hover {
-  color: var(--green);
-  border-color: var(--green2);
-  box-shadow: 0 2px 16px var(--glow-green);
+#category-select:hover {
+  color: var(--blue6);
+  border-color: var(--blue6);
+  box-shadow: none;
+}
+
+#category-select:focus {
+  outline: none;
+  border-color: var(--blue6);
+}
+
+#playlist-select {
+  transition: none;
+}
+
+#playlist-select:hover,
+#playlist-select:focus {
+  color: var(--blue6);
+  border-color: var(--blue5);
+  box-shadow: none;
+  outline: none;
 }
 
 #playlist-select:disabled {

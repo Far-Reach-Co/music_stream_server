@@ -1,6 +1,6 @@
 # Music Streaming Server | Far Reach Co.
 
-A music streaming server built with FastAPI, FFmpeg, and PostgreSQL-backed sessions. Streams audio files from S3/CloudFront using signed URLs and allows authenticated users to control playback. Tracks are registered via CSV and organized into named playlists.
+A music streaming server built with FastAPI, FFmpeg, and Redis-backed sessions. Streams audio files from S3/CloudFront using signed URLs and allows authenticated users to control playback. Tracks are registered via CSV and organized into named playlists.
 
 ---
 
@@ -36,6 +36,9 @@ Set the following environment variables (or in `.env` file):
 ```bash
 # Session/Auth
 SESSION_SECRET=your-signing-secret
+REDIS_URL=redis://localhost:6379
+
+# User metadata lookups (pro/admin checks)
 PG_DB=your_database
 PG_USER=your_user
 PG_PW=your_password
@@ -53,13 +56,13 @@ CLOUDFRONT_PRIVATE_KEY_PATH=./private_frc_cloudfront_key.pem
 TRACKS_CSV_PATH=tracks.csv          # Default: tracks.csv (or Google Sheets URL)
 PLAYLISTS_CSV_PATH=playlists.csv    # Default: playlists.csv (or Google Sheets URL)
 SESSION_COOKIE_NAME=frc_session     # Default: frc_session
+SESSION_REDIS_PREFIX=frc:sess:      # Default: frc:sess:
 HOST=0.0.0.0                        # Default: 0.0.0.0
 PORT=5000                           # Default: 5000
 CHUNK_SIZE=1024                     # Default: 1024
 LISTENER_QUEUE_MAXSIZE=256          # Default: 256
 IDLE_TIMEOUT=600                    # Default: 600 (seconds)
 LOGIN_URL=https://example.com/login # Redirect URL for unauthenticated users
-REDIS_URL=redis://localhost:6379    # Default: redis://localhost:6379
 ```
 
 ### Admin
@@ -173,21 +176,20 @@ uvicorn radio:service.app --reload --host 0.0.0.0 --port 5000
 
 This server reads Express-compatible signed cookies (e.g., `s:<value>.<sig>`) and validates them using HMAC SHA256.
 
-Session data is loaded from a `session` table in PostgreSQL. Example schema:
+Session data is loaded from Redis using the key format:
 
-```sql
-CREATE TABLE session (
-  sid VARCHAR PRIMARY KEY,
-  sess JSONB NOT NULL,
-  expire TIMESTAMP NOT NULL
-);
+```text
+frc:sess:<sid>
 ```
+
+`frc:sess:` is configurable via `SESSION_REDIS_PREFIX`.
 
 Expected JSON structure:
 
 ```json
 {
-  "user": "user_id_value"
+  "user": "user_id_value",
+  "cookie": {}
 }
 ```
 

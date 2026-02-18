@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import json
 import queue
 import re
 import signal
@@ -9,6 +10,7 @@ import urllib.parse
 import logging
 import psycopg2
 import psycopg2.pool
+import redis
 import uvicorn
 
 from fastapi import FastAPI, Request, Response, Depends, HTTPException
@@ -26,6 +28,8 @@ from config import (
     SESSION_COOKIE_NAME,
     SESSION_SECRET,
     SESSION_DB_DSN,
+    REDIS_URL,
+    SESSION_REDIS_PREFIX,
     HOST,
     PORT,
     LOGIN_URL,
@@ -69,6 +73,7 @@ class RadioWebService:
         self.channels = {}
         self.streamers = {}
         self._lock = threading.Lock()
+        self.session_redis_client = None
         self.db_pool = psycopg2.pool.ThreadedConnectionPool(
             minconn=2, maxconn=10, dsn=SESSION_DB_DSN
         )
@@ -97,6 +102,9 @@ class RadioWebService:
             if self.db_pool:
                 self.db_pool.closeall()
                 logger.info("[DB] Connection pool closed")
+            if self.session_redis_client:
+                self.session_redis_client.close()
+                logger.info("[Session] Redis client closed")
 
     def _validate_channel_name(self, name: str) -> tuple[bool, str]:
         """Validate channel name format and length."""
@@ -120,6 +128,46 @@ class RadioWebService:
                 self.channels[name] = Channel(name)
             return self.channels[name]
 
+    def _get_session_redis_client(self):
+        if self.session_redis_client is None:
+            try:
+                self.session_redis_client = redis.from_url(
+                    REDIS_URL, decode_responses=True
+                )
+                self.session_redis_client.ping()
+                logger.info("[Session] Redis client connected")
+            except Exception as e:
+                logger.warning(f"[Session] Redis unavailable: {e}")
+                self.session_redis_client = None
+        return self.session_redis_client
+
+    def _get_session_data(self, session_id: str):
+        client = self._get_session_redis_client()
+        if not client:
+            return None
+
+        session_key = f"{SESSION_REDIS_PREFIX}{session_id}"
+        try:
+            raw_session = client.get(session_key)
+            if not raw_session:
+                return None
+            session_data = json.loads(raw_session)
+            if not isinstance(session_data, dict):
+                logger.warning(
+                    f"[Session] Unexpected session payload type for key {session_key}"
+                )
+                return None
+            return session_data
+        except json.JSONDecodeError:
+            logger.warning(f"[Session] Invalid JSON payload for key {session_key}")
+            return None
+        except redis.RedisError as e:
+            logger.warning(f"[Session] Redis read error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"[Session] Unexpected Redis session error: {e}", exc_info=True)
+            return None
+
     def create_session_middleware(self):
         async def session_middleware(request: Request, call_next):
             cookie = request.cookies.get(SESSION_COOKIE_NAME)
@@ -132,31 +180,13 @@ class RadioWebService:
                 logger.warning(f"[Session] Invalid signature for {request.url.path}")
                 return await call_next(request)
 
-            conn = None
-            try:
-                conn = self.db_pool.getconn()
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "SELECT sess FROM session WHERE sid = %s AND expire > NOW()",
-                        (session_id,),
-                    )
-                    row = cur.fetchone()
-                    if not row:
-                        logger.info("[Session] Session expired or not found")
-                        return await call_next(request)
+            session_data = self._get_session_data(session_id)
+            if not session_data:
+                logger.info("[Session] Session not found")
+                return await call_next(request)
 
-                    session_data = row[0]
-                    request.state.session_data = session_data
-                    request.state.user_id = session_data.get("user")
-            except psycopg2.OperationalError as e:
-                logger.warning(f"[Session] DB connection error: {e}")
-            except psycopg2.ProgrammingError as e:
-                logger.error(f"[Session] DB query error: {e}")
-            except Exception as e:
-                logger.error(f"[Session] Unexpected error: {e}", exc_info=True)
-            finally:
-                if conn:
-                    self.db_pool.putconn(conn)
+            request.state.session_data = session_data
+            request.state.user_id = session_data.get("user")
 
             return await call_next(request)
 

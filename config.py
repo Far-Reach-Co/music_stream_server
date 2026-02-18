@@ -32,8 +32,9 @@ CLOUDFRONT_DOMAIN = os.getenv("CLOUDFRONT_DOMAIN") or exit("CLOUDFRONT_DOMAIN is
 CLOUDFRONT_KEY_ID = os.getenv("CLOUDFRONT_KEY_ID") or exit("CLOUDFRONT_KEY_ID is required")
 CLOUDFRONT_PRIVATE_KEY_PATH = os.getenv("CLOUDFRONT_PRIVATE_KEY_PATH") or exit("CLOUDFRONT_PRIVATE_KEY_PATH is required")
 
-# Redis configuration (for signed URL caching)
+# Redis configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+SESSION_REDIS_PREFIX = os.getenv("SESSION_REDIS_PREFIX", "frc:sess:")
 
 # Server configuration
 HOST = os.getenv("HOST", "0.0.0.0")

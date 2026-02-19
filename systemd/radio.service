@@ -1,0 +1,17 @@
+[Unit]
+Description=FarReach Radio Streaming Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/music_stream_server
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /root/music_stream_server/radio.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

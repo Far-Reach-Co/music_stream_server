@@ -36,13 +36,19 @@ Set the following environment variables (or in `.env` file):
 ```bash
 # Session/Auth
 SESSION_SECRET=your-signing-secret
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://your-redis-host:6379
 
 # User metadata lookups (pro/admin checks)
+DATABASE_URL=postgresql://user:password@db-host:5432/your_database
+PG_SSL=true                               # Optional
+PG_SSL_REJECT_UNAUTHORIZED=false          # Optional
+
+# Backward-compatible fallback if DATABASE_URL is not set:
 PG_DB=your_database
 PG_USER=your_user
 PG_PW=your_password
-PG_HOST=localhost
+PG_HOST=your-db-host
+PG_PORT=5432
 
 # CloudFront
 CLOUDFRONT_DOMAIN=d1234567890.cloudfront.net

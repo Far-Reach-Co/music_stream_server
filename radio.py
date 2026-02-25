@@ -305,7 +305,7 @@ class RadioWebService:
                 "active_channels": len(self.channels),
             }
 
-        @self.app.get("/robots.txt")
+        @self.app.api_route("/robots.txt", methods=["GET", "HEAD"])
         @limiter.limit("60/minute")
         def robots_txt(request: Request):
             base_url = self._get_public_base_url(request)
@@ -322,7 +322,7 @@ class RadioWebService:
             )
             return Response(content=robots, media_type="text/plain")
 
-        @self.app.get("/sitemap.xml")
+        @self.app.api_route("/sitemap.xml", methods=["GET", "HEAD"])
         @limiter.limit("60/minute")
         def sitemap_xml(request: Request):
             base_url = self._get_public_base_url(request)

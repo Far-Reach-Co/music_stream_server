@@ -133,6 +133,7 @@ SESSION_REDIS_PREFIX = os.getenv("SESSION_REDIS_PREFIX", "frc:sess:")
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "5000"))
 LOGIN_URL = os.getenv("LOGIN_URL", "https://farreachco.com/login")
+PUBLIC_BASE_URL = (os.getenv("PUBLIC_BASE_URL") or "").strip().rstrip("/")
 
 # Session configuration
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "frc_session")

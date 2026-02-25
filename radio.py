@@ -33,6 +33,7 @@ from config import (
     HOST,
     PORT,
     LOGIN_URL,
+    PUBLIC_BASE_URL,
     ADMIN_EMAILS,
     DEV_MODE,
     DEV_USER_EMAIL,
@@ -67,6 +68,11 @@ class LoginRedirectException(Exception):
 class RadioWebService:
     MAX_CHANNEL_NAME_LENGTH = 256
     ALLOWED_COMMANDS = {"stop", "next"}
+
+    def _get_public_base_url(self, request: Request) -> str:
+        if PUBLIC_BASE_URL:
+            return PUBLIC_BASE_URL
+        return str(request.base_url).rstrip("/")
 
     def __init__(self):
         self.app = FastAPI()
@@ -281,7 +287,7 @@ class RadioWebService:
                 html = html.replace("</body>", footer_html + "</body>")
 
             if request is not None:
-                base_url = str(request.base_url).rstrip("/")
+                base_url = self._get_public_base_url(request)
                 html = html.replace("__BASE_URL__", base_url)
 
             return Response(content=html, media_type="text/html")
@@ -302,7 +308,7 @@ class RadioWebService:
         @self.app.get("/robots.txt")
         @limiter.limit("60/minute")
         def robots_txt(request: Request):
-            base_url = str(request.base_url).rstrip("/")
+            base_url = self._get_public_base_url(request)
             robots = (
                 "User-agent: *\n"
                 "Allow: /\n"
@@ -319,7 +325,7 @@ class RadioWebService:
         @self.app.get("/sitemap.xml")
         @limiter.limit("60/minute")
         def sitemap_xml(request: Request):
-            base_url = str(request.base_url).rstrip("/")
+            base_url = self._get_public_base_url(request)
             xml = (
                 '<?xml version="1.0" encoding="UTF-8"?>\n'
                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'

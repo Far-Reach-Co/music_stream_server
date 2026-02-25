@@ -69,6 +69,7 @@ CHUNK_SIZE=1024                     # Default: 1024
 LISTENER_QUEUE_MAXSIZE=256          # Default: 256
 IDLE_TIMEOUT=600                    # Default: 600 (seconds)
 LOGIN_URL=https://example.com/login # Redirect URL for unauthenticated users
+PUBLIC_BASE_URL=https://radio.example.com # Optional: forces canonical/sitemap/robots URLs
 ```
 
 ### Admin

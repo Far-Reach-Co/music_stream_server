@@ -262,7 +262,7 @@ class RadioWebService:
                 self.db_pool.putconn(conn)
 
         # Helper to load an HTML file and inject the footer snippet server-side
-    def _render_file_with_footer(self, relpath: str):
+    def _render_file_with_footer(self, relpath: str, request: Request = None):
         try:
             base = Path(__file__).parent
             file_path = base / relpath
@@ -279,6 +279,10 @@ class RadioWebService:
                 html = html.replace(placeholder, footer_html)
             else:
                 html = html.replace("</body>", footer_html + "</body>")
+
+            if request is not None:
+                base_url = str(request.base_url).rstrip("/")
+                html = html.replace("__BASE_URL__", base_url)
 
             return Response(content=html, media_type="text/html")
         except Exception as e:
@@ -298,12 +302,40 @@ class RadioWebService:
         @self.app.get("/robots.txt")
         @limiter.limit("60/minute")
         def robots_txt(request: Request):
-            return FileResponse("static/robots.txt", media_type="text/plain")
+            base_url = str(request.base_url).rstrip("/")
+            robots = (
+                "User-agent: *\n"
+                "Allow: /\n"
+                "Disallow: /admin\n"
+                "Disallow: /host\n"
+                "Disallow: /command\n"
+                "Disallow: /reload\n"
+                "Disallow: /playlists\n"
+                "Disallow: /stream\n"
+                f"Sitemap: {base_url}/sitemap.xml\n"
+            )
+            return Response(content=robots, media_type="text/plain")
+
+        @self.app.get("/sitemap.xml")
+        @limiter.limit("60/minute")
+        def sitemap_xml(request: Request):
+            base_url = str(request.base_url).rstrip("/")
+            xml = (
+                '<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                "  <url>\n"
+                f"    <loc>{base_url}/</loc>\n"
+                "    <changefreq>daily</changefreq>\n"
+                "    <priority>1.0</priority>\n"
+                "  </url>\n"
+                "</urlset>\n"
+            )
+            return Response(content=xml, media_type="application/xml")
 
         @self.app.get("/")
         @limiter.limit("30/minute")
         def index(request: Request):
-            return self._render_file_with_footer("static/index.html")
+            return self._render_file_with_footer("static/index.html", request=request)
 
         @self.app.get("/listen")
         @limiter.limit("30/minute")

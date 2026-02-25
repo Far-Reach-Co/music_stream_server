@@ -1,2 +1,9 @@
 User-agent: *
-Disallow: /
+Allow: /
+Disallow: /admin
+Disallow: /host
+Disallow: /command
+Disallow: /reload
+Disallow: /playlists
+Disallow: /stream
+Sitemap: /sitemap.xml

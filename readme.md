@@ -179,6 +179,67 @@ uvicorn radio:service.app --reload --host 0.0.0.0 --port 5000
 
 ---
 
+## Artifact Deploy (No Git on Server)
+
+Deploys use versioned tarball artifacts copied to the server and activated via a `current` symlink.
+
+### Server Layout
+
+```text
+/root/music_stream_server/
+├── .env
+├── private_frc_cloudfront_key.pem
+├── artifacts/
+├── releases/
+└── current -> /root/music_stream_server/releases/music_stream_server_YYYYMMDDHHMMSS
+```
+
+### Build Artifact
+
+```bash
+./scripts/build_artifact.sh
+```
+
+This prints the generated artifact path (for example `dist/music_stream_server_20260226153000.tar.gz`).
+
+### Deploy Artifact
+
+```bash
+./scripts/deploy_artifact.sh dist/music_stream_server_20260226153000.tar.gz
+```
+
+Build + deploy in one step:
+
+```bash
+./scripts/release.sh
+```
+
+Optional environment variables:
+
+```bash
+MUSIC_SERVER=root@your-server
+MUSIC_SSH_KEY=~/.ssh/your_key
+MUSIC_DEPLOY_ROOT=/root/music_stream_server
+MUSIC_SERVICE_NAME=radio.service
+MUSIC_KEEP_RELEASES=3
+```
+
+### Rollback
+
+Rollback to previous release:
+
+```bash
+./scripts/rollback_artifact.sh
+```
+
+Rollback to a specific release directory name:
+
+```bash
+./scripts/rollback_artifact.sh music_stream_server_20260226153000
+```
+
+---
+
 ## Authentication
 
 This server reads Express-compatible signed cookies (e.g., `s:<value>.<sig>`) and validates them using HMAC SHA256.

@@ -5,9 +5,10 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/music_stream_server
+WorkingDirectory=/root/music_stream_server/current
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 /root/music_stream_server/radio.py
+EnvironmentFile=-/root/music_stream_server/.env
+ExecStart=/root/music_stream_server/current/venv/bin/python /root/music_stream_server/current/radio.py
 Restart=always
 RestartSec=5
 StandardOutput=journal

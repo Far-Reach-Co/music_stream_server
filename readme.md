@@ -355,35 +355,11 @@ kill -HUP $(pgrep -f "python.*radio.py")
 
 ---
 
-## Deploy (Systemd)
-
-This repo includes local deploy and service scripts for the same droplet workflow used in dm-dash.
-
-Deploy from local:
-
-```bash
-./scripts/deploy.sh
-```
-
-What deploy does:
-1. SSHes to `root@165.227.88.65`
-2. Ensures `/root/music_stream_server` is a git checkout (re-clones if `.git` is missing)
-3. Pulls `origin main`
-4. Runs `python3 -m pip install --no-cache-dir -r requirements.txt`
-5. Installs/updates `systemd/radio.service` and restarts `radio.service`
-6. Runs a local health check on `http://127.0.0.1:5000/`
-
-Service commands:
+## Service Commands
 
 ```bash
 ./scripts/service.sh status
 ./scripts/service.sh logs
 ./scripts/service.sh restart
 ./scripts/service.sh stop
-```
-
-Optional overrides:
-
-```bash
-MUSIC_SERVER=root@your-server-ip MUSIC_BRANCH=main ./scripts/deploy.sh
 ```

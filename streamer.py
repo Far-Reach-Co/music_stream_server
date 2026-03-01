@@ -28,6 +28,12 @@ class AudioStreamer:
         self.current_track_title = None
         self.current_track_album = None
 
+    def _clear_current_track(self):
+        self.current_track_key = None
+        self.current_track_filename = None
+        self.current_track_title = None
+        self.current_track_album = None
+
     def start(self):
         if not self.thread.is_alive():
             self.thread.start()
@@ -90,12 +96,22 @@ class AudioStreamer:
                 title = track_info.get("title") if track_info else None
                 album = track_info.get("album") if track_info else None
 
+                try:
+                    track_url = get_signed_url(track_filename)
+                except Exception as e:
+                    self._clear_current_track()
+                    logger.error(
+                        f"[Streamer] Failed to generate signed URL for track '{track_key}' ({track_filename}): {e}",
+                        exc_info=True,
+                    )
+                    time.sleep(1)
+                    continue
+
                 # Update currently-playing metadata for listeners and API
                 self.current_track_key = track_key
                 self.current_track_filename = track_filename
                 self.current_track_title = title
                 self.current_track_album = album
-                track_url = get_signed_url(track_filename)
                 logger.info(
                     f"Now playing: {track_key} ({track_filename}) - {title or ''}"
                 )
@@ -120,10 +136,12 @@ class AudioStreamer:
                     )
                 except FileNotFoundError:
                     logger.error("FFmpeg not found in PATH")
+                    self._clear_current_track()
                     time.sleep(5)
                     continue
                 except Exception as e:
                     logger.error(f"Failed to start FFmpeg: {e}")
+                    self._clear_current_track()
                     time.sleep(5)
                     continue
 
@@ -170,10 +188,7 @@ class AudioStreamer:
 
                 finally:
                     # Clear current track state when finished or on error
-                    self.current_track_key = None
-                    self.current_track_filename = None
-                    self.current_track_title = None
-                    self.current_track_album = None
+                    self._clear_current_track()
                     if proc.poll() is None:
                         proc.kill()
                     if proc.stdout:

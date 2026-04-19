@@ -351,7 +351,36 @@ kill -HUP $(pgrep -f "python.*radio.py")
 - FFmpeg reads directly from the signed URL and transcodes to MP3
 - The server streams `.mp3`, `.wav`, `.ogg`, `.flac` files (any format FFmpeg supports)
 - You must have `ffmpeg` installed and accessible from the command line
-- Background streamer threads terminate if no listeners connect for `IDLE_TIMEOUT` seconds (default 600)
+- Background streamer threads terminate if no listeners connect for `IDLE_TIMEOUT` seconds (default 900)
+
+---
+
+## Stream Smoke Test
+
+Run a black-box listener continuity check against an active channel:
+
+```bash
+python3 scripts/stream_smoke_test.py \
+  --base-url https://radio.farreachco.com \
+  --channel dnd_radio_danya_eng \
+  --duration 960 \
+  --listeners 2
+```
+
+The default 960 second duration intentionally crosses the 900 second idle timeout.
+The test opens real `/stream` listeners, polls `/nowplaying`, and fails if a
+listener stream closes early or has a read gap longer than `--max-gap-seconds`.
+
+To start a fresh test channel first, provide a playlist and an authenticated
+session cookie:
+
+```bash
+RADIO_SESSION_COOKIE='frc_session=...' python3 scripts/stream_smoke_test.py \
+  --base-url https://radio.farreachco.com \
+  --playlist tavern_ambience
+```
+
+For local dev with `DEV_MODE=true`, the cookie is not required.
 
 ---
 

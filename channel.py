@@ -43,8 +43,11 @@ class Channel:
 
     def send_command(self, cmd: str, streamers: dict):
         with self._lock:
-            if self.current_playlist and self.current_playlist in streamers:
-                logger.info(f"[Channel] '{self.name}' sending command '{cmd}' to playlist '{self.current_playlist}'")
-                streamers[self.current_playlist].put_command(cmd)
+            playlist = self.current_playlist
+            if playlist and playlist in streamers:
+                logger.info(f"[Channel] '{self.name}' sending command '{cmd}' to playlist '{playlist}'")
+                streamers[playlist].put_command(cmd)
+                if cmd == "stop":
+                    self.current_playlist = None
             else:
                 logger.warning(f"[Channel] '{self.name}' command '{cmd}' ignored — no active playlist")

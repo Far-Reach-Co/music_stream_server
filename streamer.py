@@ -4,6 +4,8 @@ import random
 import threading
 import subprocess
 import logging
+import re
+import tempfile
 
 from config import CHUNK_SIZE, IDLE_TIMEOUT
 from tracks import get_track_filename, get_track_info
@@ -11,6 +13,10 @@ from playlists import get_playlist
 from cloudfront import get_signed_url
 
 logger = logging.getLogger("radio")
+
+
+def _sanitize_ffmpeg_stderr(stderr_text: str) -> str:
+    return re.sub(r"(https?://[^\s?]+)\?[^\s]+", r"\1?<redacted>", stderr_text).strip()
 
 
 class AudioStreamer:
@@ -47,16 +53,24 @@ class AudioStreamer:
             if channel_name not in self.listener_queues:
                 self.listener_queues[channel_name] = set()
             self.listener_queues[channel_name].add(q)
+            channel_count = len(self.listener_queues[channel_name])
+            total_count = sum(len(queues) for queues in self.listener_queues.values())
 
         # Presence matters more than sound
         self.last_listener_time = time.time()
+        return channel_count, total_count
 
     def remove_listener(self, channel_name, q):
         with self.listener_queues_lock:
+            channel_count = 0
             if channel_name in self.listener_queues:
                 self.listener_queues[channel_name].discard(q)
                 if not self.listener_queues[channel_name]:
                     del self.listener_queues[channel_name]
+                else:
+                    channel_count = len(self.listener_queues[channel_name])
+            total_count = sum(len(queues) for queues in self.listener_queues.values())
+            return channel_count, total_count
 
     def put_command(self, cmd: str):
         self.command_queue.put(cmd)
@@ -116,12 +130,14 @@ class AudioStreamer:
                     f"Now playing: {track_key} ({track_filename}) - {title or ''}"
                 )
 
+                stderr_file = None
                 try:
+                    stderr_file = tempfile.TemporaryFile()
                     proc = subprocess.Popen(
                         [
                             "ffmpeg",
                             "-hide_banner",
-                            "-loglevel", "quiet",
+                            "-loglevel", "error",
                             "-re",
                             "-i", track_url,
                             "-vn",
@@ -132,14 +148,18 @@ class AudioStreamer:
                             "-",
                         ],
                         stdout=subprocess.PIPE,
-                        stderr=subprocess.DEVNULL,
+                        stderr=stderr_file,
                     )
                 except FileNotFoundError:
+                    if stderr_file:
+                        stderr_file.close()
                     logger.error("FFmpeg not found in PATH")
                     self._clear_current_track()
                     time.sleep(5)
                     continue
                 except Exception as e:
+                    if stderr_file:
+                        stderr_file.close()
                     logger.error(f"Failed to start FFmpeg: {e}")
                     self._clear_current_track()
                     time.sleep(5)
@@ -195,4 +215,17 @@ class AudioStreamer:
                         proc.stdout.close()
                     proc.wait()
                     if proc.returncode and proc.returncode != 0:
-                        logger.warning(f"[Streamer] FFmpeg exited with code {proc.returncode} for track '{track_key}'")
+                        stderr = ""
+                        if stderr_file:
+                            stderr_file.seek(0)
+                            stderr = _sanitize_ffmpeg_stderr(
+                                stderr_file.read().decode("utf-8", errors="replace")
+                            )
+                        if stderr:
+                            logger.warning(
+                                f"[Streamer] FFmpeg exited with code {proc.returncode} for track '{track_key}': {stderr}"
+                            )
+                        else:
+                            logger.warning(f"[Streamer] FFmpeg exited with code {proc.returncode} for track '{track_key}'")
+                    if stderr_file:
+                        stderr_file.close()

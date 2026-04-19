@@ -6,6 +6,7 @@ import queue
 import re
 import signal
 import threading
+import time
 import urllib.parse
 import logging
 import psycopg2
@@ -41,6 +42,7 @@ from config import (
 from tracks import reload_tracks, get_track_count
 from playlists import get_playlist, get_all_playlists, get_free_playlists, is_pro_playlist, reload_playlists, reload_pro_playlists, get_playlist_count
 from channel import Channel
+from streamer import AudioStreamer
 import os
 from pathlib import Path
 
@@ -133,6 +135,24 @@ class RadioWebService:
                 logger.info(f"[Channel] Creating new channel: {name}")
                 self.channels[name] = Channel(name)
             return self.channels[name]
+
+    def _ensure_streamer(self, playlist_name: str) -> AudioStreamer:
+        with self._lock:
+            streamer = self.streamers.get(playlist_name)
+            if streamer and streamer.thread.is_alive():
+                return streamer
+
+            if streamer:
+                logger.info(
+                    f"[Streamer] Restarting inactive streamer for playlist '{playlist_name}'"
+                )
+            else:
+                logger.info(f"[Streamer] Starting streamer for playlist '{playlist_name}'")
+
+            streamer = AudioStreamer(playlist_name=playlist_name)
+            self.streamers[playlist_name] = streamer
+            streamer.start()
+            return streamer
 
     def _get_session_redis_client(self):
         if self.session_redis_client is None:
@@ -294,7 +314,7 @@ class RadioWebService:
         except Exception as e:
             logger.exception("[Render] Error injecting footer")
             return FileResponse(relpath)
-        
+
     def _define_routes(self):
         @self.app.get("/health")
         def health():
@@ -523,11 +543,14 @@ class RadioWebService:
             try:
                 channel = self._get_channel(channel_name)
                 playlist = channel.current_playlist
-                if not playlist or playlist not in self.streamers:
+                if not playlist:
                     return Response(content="Channel not active", status_code=400)
 
+                streamer = self._ensure_streamer(playlist)
                 q = queue.Queue(maxsize=LISTENER_QUEUE_MAXSIZE)
-                self.streamers[playlist].add_listener(channel_name, q)
+                channel_listeners, total_listeners = streamer.add_listener(
+                    channel_name, q
+                )
 
                 try:
                     q.put_nowait(SILENT_BUFFER)
@@ -535,28 +558,38 @@ class RadioWebService:
                     pass
 
                 def generate():
-                    logger.info(f"[Stream] Client connected to {channel_name}")
+                    started_at = time.monotonic()
+                    chunks_sent = 0
+                    bytes_sent = 0
+                    logger.info(
+                        f"[Stream] Client connected to {channel_name} "
+                        f"(playlist='{playlist}', channel_listeners={channel_listeners}, "
+                        f"total_listeners={total_listeners})"
+                    )
                     try:
                         yield SILENT_BUFFER
+                        chunks_sent += 1
+                        bytes_sent += len(SILENT_BUFFER)
                         while True:
                             try:
                                 chunk = q.get(timeout=5)
                             except queue.Empty:
                                 chunk = SILENT_BUFFER
                             yield chunk
+                            chunks_sent += 1
+                            bytes_sent += len(chunk)
                     finally:
-                        try:
-                            self.streamers[playlist].remove_listener(channel_name, q)
-                            if not self.streamers[playlist].listener_queues.get(
-                                channel_name
-                            ):
-                                with self._lock:
-                                    logger.info(
-                                        f"[Channel] No more listeners on '{channel_name}', removing channel"
-                                    )
-                                    self.channels.pop(channel_name, None)
-                        except KeyError:
-                            logger.warning(f"[Stream] Cleanup: streamer or channel already removed for '{channel_name}'")
+                        channel_remaining, total_remaining = streamer.remove_listener(
+                            channel_name, q
+                        )
+                        elapsed = time.monotonic() - started_at
+                        logger.info(
+                            f"[Stream] Client disconnected from {channel_name} "
+                            f"(playlist='{playlist}', seconds={elapsed:.1f}, "
+                            f"chunks={chunks_sent}, bytes={bytes_sent}, "
+                            f"channel_listeners={channel_remaining}, "
+                            f"total_listeners={total_remaining})"
+                        )
 
                 return StreamingResponse(
                     generate(),

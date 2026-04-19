@@ -98,7 +98,7 @@ def _resolve_database_dsn() -> str:
 # === Config ===
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1024"))
 LISTENER_QUEUE_MAXSIZE = int(os.getenv("LISTENER_QUEUE_MAXSIZE", "256"))
-IDLE_TIMEOUT = int(os.getenv("IDLE_TIMEOUT", "600"))
+IDLE_TIMEOUT = int(os.getenv("IDLE_TIMEOUT", "900"))
 SILENCE_PATH = os.getenv("SILENCE_PATH", "silence.mp3")
 MUSIC_BASE_DIR = os.getenv("MUSIC_BASE_DIR", "music")
 

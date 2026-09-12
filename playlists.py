@@ -12,6 +12,23 @@ _playlists: dict[str, list[str]] = {}
 _pro_playlists: set[str] | None = None
 
 
+def _normalize_header(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def _get_playlist_title(row: dict[str, str]) -> str:
+    """Read playlist title from exact or prefixed CSV headers."""
+    exact = (row.get("Playlist Title") or "").strip()
+    if exact:
+        return exact
+
+    for header, value in row.items():
+        if _normalize_header(header).endswith("playlisttitle"):
+            return (value or "").strip()
+
+    return ""
+
+
 def _load_playlists():
     """Load playlists from CSV file or Google Sheets URL.
 
@@ -26,7 +43,7 @@ def _load_playlists():
         reader, file_handle = read_csv(PLAYLISTS_CSV_PATH)
 
         for row in reader:
-            playlist_title = row.get("Playlist Title", "").strip()
+            playlist_title = _get_playlist_title(row)
             track_key = row.get("Track Key", "").strip()
             if playlist_title and track_key:
                 if playlist_title not in new_playlists:
@@ -60,7 +77,7 @@ def _load_pro_playlists():
         reader, file_handle = read_csv(PRO_PLAYLISTS_CSV_PATH)
 
         for row in reader:
-            playlist_title = row.get("Playlist Title", "").strip()
+            playlist_title = _get_playlist_title(row)
             if playlist_title:
                 new_pro.add(playlist_title)
 
@@ -69,6 +86,14 @@ def _load_pro_playlists():
 
         _pro_playlists = new_pro
         logger.info(f"Loaded {len(_pro_playlists)} pro playlists")
+        if _playlists:
+            missing = sorted(name for name in _pro_playlists if name not in _playlists)
+            if missing:
+                logger.warning(
+                    "Pro playlists CSV contains %s playlist(s) not present in playlists CSV: %s",
+                    len(missing),
+                    ", ".join(missing[:10]),
+                )
 
     except FileNotFoundError:
         logger.warning(f"Pro playlists CSV not found: {PRO_PLAYLISTS_CSV_PATH}. All playlists will be free.")

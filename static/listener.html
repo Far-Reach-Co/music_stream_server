@@ -43,6 +43,15 @@
     const volumeSlider = document.getElementById("volume");
     const volumeDisplay = document.getElementById("volume-display");
 
+    function sliderToVolume(sliderValue) {
+      const position = Math.max(0, Math.min(1, Number(sliderValue)));
+      if (position === 0) return 0;
+
+      const minDb = -50;
+      const db = minDb + position * -minDb;
+      return Math.pow(10, db / 20);
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const channel = urlParams.get("channel");
     document.getElementById("channel-name").textContent = channel || "(none)";
@@ -59,7 +68,7 @@
 
       audio.src = "/stream?channel=" + encodeURIComponent(channel) + "&_=" + Date.now();
       audio.load();
-      audio.volume = parseFloat(volumeSlider.value);
+      audio.volume = sliderToVolume(volumeSlider.value);
       audio.style.display = "inline";
       button.style.display = "none";
 
@@ -73,9 +82,9 @@
     });
 
     volumeSlider.addEventListener("input", () => {
-      const volValue = parseFloat(volumeSlider.value);
-      audio.volume = volValue;
-      volumeDisplay.textContent = Math.round(volValue * 100) + "%";
+      const sliderValue = Number(volumeSlider.value);
+      audio.volume = sliderToVolume(sliderValue);
+      volumeDisplay.textContent = Math.round(sliderValue * 100) + "%";
     });
 
     const nowEl = document.getElementById('now-playing');

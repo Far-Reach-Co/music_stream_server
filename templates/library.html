@@ -39,7 +39,7 @@
       <p id="playback-status" role="status"></p>
     </section>
     <p id="results-status" role="status">Loading library…</p>
-    <div class="table-wrap"><table aria-label="Music library"><thead><tr><th>Listen</th><th>Track</th><th>Album</th><th>Playlists</th></tr></thead><tbody id="tracks"></tbody></table></div>
+    <div class="table-wrap"><table aria-label="Music library"><thead><tr><th>Listen</th><th>Track</th><th>Album</th><th>Playlists</th><th>Download</th></tr></thead><tbody id="tracks"></tbody></table></div>
   </main>
   <script>
     const search = document.getElementById('search');
@@ -77,7 +77,16 @@
         const action = row.insertCell(); const button = document.createElement('button'); button.textContent = 'Play'; button.setAttribute('aria-label', `Play ${track.title || track.key}`); button.onclick = () => play(track); action.append(button);
         const title = row.insertCell(); title.textContent = track.title || track.key;
         const metadata = document.createElement('span'); metadata.className = 'metadata'; metadata.textContent = `${track.key} · ${track.filename}`; title.append(metadata);
-        row.insertCell().textContent = track.album || '—'; row.insertCell().textContent = track.playlists.join(', ') || '—'; fragment.append(row);
+        row.insertCell().textContent = track.album || '—'; row.insertCell().textContent = track.playlists.join(', ') || '—';
+        const downloadCell = row.insertCell();
+        if (track.filename.toLowerCase().endsWith('.mp3')) {
+          const download = document.createElement('a'); download.textContent = 'MP3';
+          download.href = '/admin/library/download?key=' + encodeURIComponent(track.key);
+          download.download = track.filename.split('/').pop();
+          download.setAttribute('aria-label', `Download MP3: ${track.title || track.key}`);
+          downloadCell.append(download);
+        } else { downloadCell.textContent = '—'; }
+        fragment.append(row);
       });
       tbody.append(fragment);
       status.textContent = tracks.length === 0 ? 'No tracks in the library.' : filtered.length === 0 ? 'No tracks match your filters.' : `${filtered.length} of ${tracks.length} tracks`;

@@ -408,3 +408,9 @@ Play opens the selected track in a single native audio player with seeking
 and volume controls. Audio uses the existing signed CloudFront URLs and does
 not affect radio channels. Library HTML lives in `templates/` so it cannot
 be accessed through the public static-file mount.
+
+
+Each MP3 track also has a Download link. `/admin/library/download?key=...`
+requires admin access and streams the existing MP3 as an attachment with its
+original filename, without conversion or affecting playback. Downloads are
+limited to 10 requests per minute per IP.

@@ -392,3 +392,19 @@ For local dev with `DEV_MODE=true`, the cookie is not required.
 ./scripts/service.sh restart
 ./scripts/service.sh stop
 ```
+
+
+## Admin Music Library
+
+Open `/admin/library` from the Music Library link on `/admin`. The page and
+its data/audio endpoints use the existing `ADMIN_EMAILS` whitelist.
+
+The library lists every registered track, with keyword search across title,
+key, filename, album and playlist names. Album and playlist filters combine
+with the search. Clear filters restores the full list. Tags are not included
+in this first version.
+
+Play opens the selected track in a single native audio player with seeking
+and volume controls. Audio uses the existing signed CloudFront URLs and does
+not affect radio channels. Library HTML lives in `templates/` so it cannot
+be accessed through the public static-file mount.

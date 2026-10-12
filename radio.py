@@ -39,7 +39,8 @@ from config import (
     DEV_MODE,
     DEV_USER_EMAIL,
 )
-from tracks import reload_tracks, get_track_count
+from tracks import reload_tracks, get_track_count, get_all_track_keys, get_track_info
+from cloudfront import get_signed_url
 from playlists import get_playlist, get_all_playlists, get_free_playlists, is_pro_playlist, reload_playlists, reload_pro_playlists, get_playlist_count
 from channel import Channel
 from streamer import AudioStreamer
@@ -263,6 +264,41 @@ class RadioWebService:
             login_target = f"{LOGIN_URL}?redirect={urllib.parse.quote(redirect_url, safe='')}"
             raise LoginRedirectException(login_target)
 
+    async def admin_required(self, request: Request):
+        await self.login_required(request)
+        # Check if user is in admin whitelist
+        if getattr(request.state, "dev_mode", False):
+            user_email = DEV_USER_EMAIL
+        else:
+            user_id = getattr(request.state, "user_id", None)
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Unauthorized")
+
+            conn = None
+            try:
+                conn = self.db_pool.getconn()
+                with conn.cursor() as cur:
+                    cur.execute(
+                        'SELECT email FROM "public"."User" WHERE id = %s',
+                        (user_id,),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        raise HTTPException(status_code=404, detail="User not found")
+                    user_email = row[0]
+            except HTTPException:
+                raise
+            except psycopg2.Error as e:
+                logger.error(f"[Admin] DB error: {e}")
+                raise HTTPException(status_code=500, detail="Database error")
+            finally:
+                if conn:
+                    self.db_pool.putconn(conn)
+
+        if user_email not in ADMIN_EMAILS:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+
     def _get_user_is_pro(self, request: Request) -> bool:
         """Check if the current user has pro status."""
         if DEV_MODE:
@@ -386,41 +422,43 @@ class RadioWebService:
         @limiter.limit("20/minute")
         async def admin_page(
             request: Request,
-            _: None = Depends(self.login_required),
+            _: None = Depends(self.admin_required),
         ):
-            # Check if user is in admin whitelist
-            if getattr(request.state, "dev_mode", False):
-                user_email = DEV_USER_EMAIL
-            else:
-                user_id = getattr(request.state, "user_id", None)
-                if not user_id:
-                    raise HTTPException(status_code=401, detail="Unauthorized")
-
-                conn = None
-                try:
-                    conn = self.db_pool.getconn()
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            'SELECT email FROM "public"."User" WHERE id = %s',
-                            (user_id,),
-                        )
-                        row = cur.fetchone()
-                        if not row:
-                            raise HTTPException(status_code=404, detail="User not found")
-                        user_email = row[0]
-                except HTTPException:
-                    raise
-                except psycopg2.Error as e:
-                    logger.error(f"[Admin] DB error: {e}")
-                    raise HTTPException(status_code=500, detail="Database error")
-                finally:
-                    if conn:
-                        self.db_pool.putconn(conn)
-
-            if user_email not in ADMIN_EMAILS:
-                raise HTTPException(status_code=403, detail="Forbidden")
-
             return FileResponse("static/admin.html")
+
+        @self.app.get("/admin/library")
+        @limiter.limit("20/minute")
+        def library_page(request: Request, _: None = Depends(self.admin_required)):
+            return FileResponse("templates/library.html", headers={"Cache-Control": "no-store"})
+
+        @self.app.get("/admin/library/tracks")
+        @limiter.limit("30/minute")
+        def library_tracks(request: Request, _: None = Depends(self.admin_required)):
+            memberships = {}
+            for name in get_all_playlists():
+                for key in get_playlist(name) or []:
+                    memberships.setdefault(key, set()).add(name)
+            library = []
+            for key in get_all_track_keys():
+                info = get_track_info(key)
+                if info:
+                    library.append({"key": key, **info,
+                                    "playlists": sorted(memberships.get(key, set()))})
+            library.sort(key=lambda track: (track["title"] or track["key"]).casefold())
+            return JSONResponse({"tracks": library}, headers={"Cache-Control": "no-store"})
+
+        @self.app.get("/admin/library/audio")
+        @limiter.limit("60/minute")
+        def library_audio(request: Request, key: str, _: None = Depends(self.admin_required)):
+            info = get_track_info(key)
+            if not info:
+                raise HTTPException(status_code=404, detail="Track not found")
+            try:
+                url = get_signed_url(info["filename"])
+            except Exception:
+                logger.exception("[Library] Unable to prepare audio")
+                raise HTTPException(status_code=503, detail="Audio is temporarily unavailable")
+            return JSONResponse({"url": url}, headers={"Cache-Control": "no-store"})
 
         @self.app.get("/playlists")
         @limiter.limit("30/minute")

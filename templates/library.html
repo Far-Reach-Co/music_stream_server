@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Music Library – FRC Radio</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { max-width: 1100px; text-align: left; background-image: none; color: var(--main-white); }
+    header { margin: 28px 0; } h1 { margin: 16px 0; }
+    .filters { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 16px; align-items: end; }
+    label { display: block; font-size: .85rem; margin-bottom: 6px; }
+    input[type="text"], select { width: 100%; height: 42px; padding: 8px 10px; background: var(--main-dark); color: var(--bright-white); border: 1px solid var(--blue2); border-radius: 4px; }
+    button { width: auto; height: auto; min-height: 42px; padding: 8px 14px; margin: 0; box-shadow: none; }
+    button:hover { box-shadow: none; transform: none; }
+    .player { margin: 24px 0; padding: 16px 0; border-top: 1px solid var(--blue5); border-bottom: 1px solid var(--blue5); }
+    audio { width: 100%; margin-top: 12px; } #playback-status { font-size: .85rem; }
+    .table-wrap { overflow-x: auto; } table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--blue5); }
+    th { font-size: .85rem; color: var(--light-gray); } td { font-size: .9rem; }
+    td:first-child { width: 80px; } .metadata { display: block; font-size: .78rem; color: var(--light-gray); overflow-wrap: anywhere; margin-top: 4px; }
+    tr[aria-current="true"] { background: var(--surface-hover); } #results-status { margin: 16px 0; }
+    @media (max-width: 650px) { .filters { grid-template-columns: 1fr 1fr; } .search { grid-column: 1 / -1; } button { max-width: none; } th, td { padding: 10px 6px; } }
+  </style>
+</head>
+<body>
+  <header><a href="/admin">← Admin</a><h1>Music Library</h1></header>
+  <main>
+    <div class="filters">
+      <div class="search"><label for="search">Keyword search</label><input id="search" type="text" placeholder="Title, key, filename, album or playlist" autocomplete="off" disabled></div>
+      <div><label for="album">Album</label><select id="album" disabled><option value="">All albums</option></select></div>
+      <div><label for="playlist">Playlist</label><select id="playlist" disabled><option value="">All playlists</option></select></div>
+      <button id="clear" disabled>Clear filters</button>
+    </div>
+    <section class="player" aria-label="Track player">
+      <p id="now-playing">Select a track to listen.</p>
+      <audio id="audio" controls preload="none"></audio>
+      <p id="playback-status" role="status"></p>
+    </section>
+    <p id="results-status" role="status">Loading library…</p>
+    <div class="table-wrap"><table aria-label="Music library"><thead><tr><th>Listen</th><th>Track</th><th>Album</th><th>Playlists</th></tr></thead><tbody id="tracks"></tbody></table></div>
+  </main>
+  <script>
+    const search = document.getElementById('search');
+    const album = document.getElementById('album');
+    const playlist = document.getElementById('playlist');
+    const audio = document.getElementById('audio');
+    const status = document.getElementById('results-status');
+    const playback = document.getElementById('playback-status');
+    const nowPlaying = document.getElementById('now-playing');
+    const tbody = document.getElementById('tracks');
+    let tracks = [], selectedKey = null, selection = 0;
+
+    async function getJSON(url) {
+      const response = await fetch(url, {cache: 'no-store'});
+      if (response.redirected || response.status === 401) throw new Error('Please sign in again through the admin page.');
+      if (response.status === 403) throw new Error('Admin access is required.');
+      if (!response.ok) throw new Error('Request failed. Please try again.');
+      return response.json();
+    }
+    function options(select, values) {
+      [...new Set(values.filter(Boolean))].sort((a,b) => a.localeCompare(b)).forEach(value => {
+        const option = document.createElement('option'); option.value = value; option.textContent = value; select.append(option);
+      });
+    }
+    function render() {
+      const words = search.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      const filtered = tracks.filter(track => {
+        const text = [track.title, track.key, track.filename, track.album, ...track.playlists].join(' ').toLocaleLowerCase();
+        return words.every(word => text.includes(word)) && (!album.value || track.album === album.value) && (!playlist.value || track.playlists.includes(playlist.value));
+      });
+      tbody.replaceChildren();
+      const fragment = document.createDocumentFragment();
+      filtered.forEach(track => {
+        const row = document.createElement('tr'); row.dataset.key = track.key; row.setAttribute('aria-current', String(track.key === selectedKey));
+        const action = row.insertCell(); const button = document.createElement('button'); button.textContent = 'Play'; button.setAttribute('aria-label', `Play ${track.title || track.key}`); button.onclick = () => play(track); action.append(button);
+        const title = row.insertCell(); title.textContent = track.title || track.key;
+        const metadata = document.createElement('span'); metadata.className = 'metadata'; metadata.textContent = `${track.key} · ${track.filename}`; title.append(metadata);
+        row.insertCell().textContent = track.album || '—'; row.insertCell().textContent = track.playlists.join(', ') || '—'; fragment.append(row);
+      });
+      tbody.append(fragment);
+      status.textContent = tracks.length === 0 ? 'No tracks in the library.' : filtered.length === 0 ? 'No tracks match your filters.' : `${filtered.length} of ${tracks.length} tracks`;
+    }
+    async function play(track) {
+      const current = ++selection;
+      audio.pause(); audio.removeAttribute('src'); audio.load();
+      selectedKey = track.key; nowPlaying.textContent = `${track.title || track.key}${track.album ? ' · ' + track.album : ''}`;
+      playback.textContent = 'Loading audio…';
+      for (const row of tbody.rows) row.setAttribute('aria-current', String(row.dataset.key === track.key));
+      try {
+        const data = await getJSON('/admin/library/audio?key=' + encodeURIComponent(track.key));
+        if (current !== selection) return;
+        audio.src = data.url;
+        await audio.play();
+        if (current === selection) playback.textContent = '';
+      } catch (error) {
+        if (current === selection) playback.textContent = error.name === 'NotAllowedError' ? 'Press play in the audio controls to listen.' : error.message;
+      }
+    }
+    audio.addEventListener('error', () => { playback.textContent = 'Could not play this track. Try selecting it again.'; });
+    [search, album, playlist].forEach(control => control.addEventListener('input', render));
+    document.getElementById('clear').onclick = () => { search.value = ''; album.value = ''; playlist.value = ''; render(); search.focus(); };
+    getJSON('/admin/library/tracks').then(data => {
+      tracks = data.tracks; options(album, tracks.map(track => track.album)); options(playlist, tracks.flatMap(track => track.playlists));
+      [search, album, playlist, document.getElementById('clear')].forEach(control => control.disabled = false); render();
+    }).catch(error => { status.textContent = error.message; });
+  </script>
+</body>
+</html>

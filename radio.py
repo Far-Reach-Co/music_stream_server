@@ -8,6 +8,8 @@ import signal
 import threading
 import time
 import urllib.parse
+import urllib.request
+import urllib.error
 import logging
 import psycopg2
 import psycopg2.pool
@@ -18,6 +20,7 @@ from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -459,6 +462,38 @@ class RadioWebService:
                 logger.exception("[Library] Unable to prepare audio")
                 raise HTTPException(status_code=503, detail="Audio is temporarily unavailable")
             return JSONResponse({"url": url}, headers={"Cache-Control": "no-store"})
+
+        @self.app.get("/admin/library/download")
+        @limiter.limit("10/minute")
+        def library_download(request: Request, key: str, _: None = Depends(self.admin_required)):
+            info = get_track_info(key)
+            if not info:
+                raise HTTPException(status_code=404, detail="Track not found")
+            filename = info["filename"].replace("\\", "/").rsplit("/", 1)[-1]
+            if not filename.lower().endswith(".mp3"):
+                raise HTTPException(status_code=400, detail="This track is not an MP3")
+            try:
+                upstream = urllib.request.urlopen(get_signed_url(info["filename"]), timeout=20)
+            except Exception:
+                logger.error("[Library] Unable to download audio")
+                raise HTTPException(status_code=503, detail="Download is temporarily unavailable")
+
+            def chunks():
+                try:
+                    while chunk := upstream.read(64 * 1024):
+                        yield chunk
+                finally:
+                    upstream.close()
+
+            headers = {
+                "Cache-Control": "no-store",
+                "Content-Disposition": "attachment; filename=\"track.mp3\"; filename*=UTF-8''" + urllib.parse.quote(filename, safe=""),
+            }
+            length = upstream.headers.get("Content-Length", "")
+            if length.isdigit():
+                headers["Content-Length"] = length
+            return StreamingResponse(chunks(), media_type="audio/mpeg", headers=headers,
+                                     background=BackgroundTask(upstream.close))
 
         @self.app.get("/playlists")
         @limiter.limit("30/minute")

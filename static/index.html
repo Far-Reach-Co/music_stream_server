@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-V5QGBFS43H"></script>
@@ -11,166 +11,84 @@
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tabletop RPG Music Streaming For TTRPG Sessions | Far Reach Radio</title>
-    <meta
-      name="description"
-      content="Far Reach Radio is a browser-based tabletop RPG music streaming tool for TTRPG sessions with synced listening, one host panel, one link, and no player accounts."
-    />
+    <link rel="icon" href="data:," />
+    <title>Tabletop RPG Music &amp; Free Playlists | Far Reach Radio</title>
+    <meta name="description" content="Original music for your next tabletop RPG session. Explore free playlists for travel, mystery, and combat. Hear a sampler, then share a stream with your group." />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="__BASE_URL__/" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Tabletop RPG Music Streaming For TTRPG Sessions | Far Reach Radio" />
-    <meta
-      property="og:description"
-      content="Run synced tabletop RPG music with one host panel, one listener link, 200+ original pieces, and a cleaner alternative to bot-driven audio setup."
-    />
+    <meta property="og:title" content="Original music for your next RPG session | Far Reach Radio" />
+    <meta property="og:description" content="From quiet journeys to desperate battles. Hear 18 tracks from our free playlists in a three-minute sampler, then bring the music to your table." />
     <meta property="og:url" content="__BASE_URL__/" />
-    <meta property="og:site_name" content="FRC Radio" />
+    <meta property="og:site_name" content="Far Reach Radio" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Tabletop RPG Music Streaming For TTRPG Sessions | Far Reach Radio" />
-    <meta
-      name="twitter:description"
-      content="Run synced tabletop RPG music with one host panel, one listener link, 200+ original pieces, and a cleaner alternative to bot-driven audio setup."
-    />
-    <link rel="stylesheet" href="static/style.css" />
+    <meta name="twitter:title" content="Original music for your next RPG session | Far Reach Radio" />
+    <meta name="twitter:description" content="From quiet journeys to desperate battles. Hear 18 tracks from our free playlists in a three-minute sampler, then bring the music to your table." />
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/home.css" />
   </head>
-  <body>
-    <h1 class="fade-in">Tabletop RPG Music Streaming For TTRPG Sessions</h1>
-    <p class="subtitle fade-in">Far Reach Radio gives hosts one panel, listeners one link, and synced session music without player accounts.</p>
+  <body class="home-page">
+    <main>
+      <section class="home-hero fade-in" aria-labelledby="home-title">
+        <p class="home-eyebrow">Far Reach Radio <span aria-hidden="true">/</span> Tabletop RPG music</p>
+        <h1 id="home-title">Original music for your next RPG session.</h1>
+        <p class="home-lead">Quiet journeys. Unsettling discoveries. Desperate battles. Find a playlist for the moment and bring your whole table into the scene.</p>
+        <div class="home-actions">
+          <a class="home-sampler-link" href="/samples"><span class="home-play" aria-hidden="true">▶</span> Preview the music <span class="home-duration">3 min</span></a>
+          <a class="home-text-link" href="#start-channel">Start a channel <span aria-hidden="true">↓</span></a>
+        </div>
+      </section>
 
-    <div class="top-links fade-in">
-      <a href="https://farreachco.com/radio" target="_blank" rel="noopener">Learn about Far Reach Radio</a>
-      <a href="https://farreachco.com/discord-music-bot-alternative" target="_blank" rel="noopener">Discord Music Bot Alternative</a>
-      <a href="https://farreachco.com/syrinscape-alternative" target="_blank" rel="noopener">Syrinscape Alternative</a>
-    </div>
+      <section class="home-channel card fade-in" id="start-channel" aria-labelledby="channel-title">
+        <p class="home-section-label">For hosts</p>
+        <h2 id="channel-title">Bring the music to your table</h2>
+        <p>Name your channel, choose a playlist, and share the listener link with your group.</p>
+        <form id="channel-form" novalidate>
+          <label for="channel-input">Channel name</label>
+          <div class="home-form-row">
+            <input type="text" id="channel-input" placeholder="Your campaign name" maxlength="256" autocomplete="off" />
+            <button class="primary" type="submit">Open host panel</button>
+          </div>
+          <p id="error-msg" class="status-msg error" role="alert"></p>
+        </form>
+        <p class="home-account-note">Host free with a <a href="https://farreachco.com" target="_blank" rel="noopener">Far Reach Co. account</a>. Your players can listen without signing in.</p>
+      </section>
 
-    <div class="card fade-in">
-      <div class="card-header">How It Works</div>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-content">
-            <strong>Create a Channel</strong>
-            <p>Enter a channel name below to open your host control panel.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-content">
-            <strong>Choose Music</strong>
-            <p>Select a playlist from the host panel to start streaming.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-content">
-            <strong>Share with Listeners</strong>
-            <p>Copy the listener link and send it out. Anyone can tune in from any browser.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card fade-in">
-      <div class="card-header">Host Authorization</div>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num" style="background: linear-gradient(135deg, var(--blue), var(--blue4)); box-shadow: 0 2px 10px var(--glow-blue);">&#x1f512;</div>
-          <div class="step-content">
-            <strong>Account Required</strong>
-            <p>To host a channel, you need an account on <a href="https://farreachco.com" target="_blank" rel="noopener">farreachco.com</a>. You must be logged in before creating or managing a channel.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num" style="background: linear-gradient(135deg, var(--purple), rgb(100, 60, 120)); box-shadow: 0 2px 10px rgba(73, 42, 87, 0.4);">&#x2605;</div>
-          <div class="step-content">
-            <strong>Pro Playlists</strong>
-            <p>Some playlists are exclusive to Pro subscribers. Free accounts can access the standard playlist library, while a Pro subscription on farreachco.com unlocks the full catalog.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card fade-in">
-      <div class="card-header">Why Far Reach Radio Fits Live Play</div>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">&#x1F3A7;</div>
-          <div class="step-content">
-            <strong>Shared Audio That Feels Effortless</strong>
-            <p>Far Reach Radio is built so your group hears the same music and ambience at roughly the same time through one shared listener link.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">&#x1F9D9;</div>
-          <div class="step-content">
-            <strong>Made for GMs Running Live Sessions</strong>
-            <p>Use it for TTRPG session music, ambience, and quick scene changes without bot commands or a heavy audio workflow.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">&#x26A1;</div>
-          <div class="step-content">
-            <strong>Instant Join by Link</strong>
-            <p>Start a channel, share one URL, and let players join instantly in their browser. No account is needed just to listen.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card fade-in">
-      <div class="card-header">Create Your Channel</div>
-      <input
-        type="text"
-        id="channel-input"
-        placeholder="Enter channel name"
-        maxlength="256"
-        autocomplete="off"
-        style="width: 100%; max-width: 320px; height: var(--butt-tall); text-align: center; display: block; margin: 0 auto 12px;"
-      />
-      <p id="error-msg" class="status-msg error" style="min-height: 1.4em;"></p>
-      <button class="primary" onclick="createChannel()">Create Channel</button>
-    </div>
-
-    <div class="info-box fade-in">
-      <p><strong>Tip:</strong> Channel names can contain letters, numbers, hyphens, and underscores. Spaces become hyphens automatically.</p>
-    </div>
+      <section class="home-how fade-in" aria-labelledby="how-title">
+        <p class="home-section-label">How it works</p>
+        <h2 id="how-title">Choose the scene. Share the soundtrack.</h2>
+        <ol class="home-steps">
+          <li><span class="home-step-number">01</span><div><strong>Find the right mood</strong><p>Tune in to playlists for travel, investigation, tension, combat, and quieter moments.</p></div></li>
+          <li><span class="home-step-number">02</span><div><strong>Let everyone tune in</strong><p>Share one link. Players open it in their browser and press play to hear the same stream.</p></div></li>
+          <li><span class="home-step-number">03</span><div><strong>Follow the adventure</strong><p>Switch to another playlist when the scene changes. The music keeps flowing while you run the game.</p></div></li>
+        </ol>
+        <p class="home-catalog-note">Start with the free playlists. Pro adds more music and exclusive playlists when you want a wider selection.</p>
+      </section>
+    </main>
 
     <script>
       const input = document.getElementById("channel-input");
       const errorMsg = document.getElementById("error-msg");
-
-      input.addEventListener("keypress", function(e) {
-        if (e.key === "Enter") createChannel();
-      });
 
       function formatChannelName(name) {
         name = name.trim();
         name = name.replace(/\s+/g, "-");
         name = name.replace(/[^a-zA-Z0-9_-]/g, "");
         name = name.replace(/-+/g, "-");
-        name = name.replace(/^-+|-+$/g, "");
-        return name;
+        return name.replace(/^-+|-+$/g, "");
       }
 
-      function validateChannelName(name) {
-        if (!name) return "Please enter a channel name";
-        if (name.length > 256) return "Channel name is too long";
-        if (!/^[a-zA-Z0-9_-]+$/.test(name)) return "Channel name contains invalid characters";
-        return null;
-      }
-
-      function createChannel() {
-        const rawName = input.value;
-        const channelName = formatChannelName(rawName);
-        const error = validateChannelName(channelName);
-        if (error) {
-          errorMsg.textContent = error;
+      document.getElementById("channel-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        const channelName = formatChannelName(input.value);
+        if (!channelName) {
+          errorMsg.textContent = "Please enter a channel name.";
+          input.focus();
           return;
         }
         errorMsg.textContent = "";
         window.location.href = `/host?channel=${encodeURIComponent(channelName)}`;
-      }
+      });
     </script>
     <div id="site-footer" aria-hidden="true"></div>
   </body>

@@ -99,29 +99,6 @@
         }
       }
 
-      async function sendCommand(cmd) {
-        if (!CHANNEL) return;
-        try {
-          const res = await fetch("/command", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ channel: CHANNEL, command: cmd }),
-          });
-          const data = await res.json();
-          if (res.ok) {
-            statusEl.className = "status-msg success";
-            statusEl.textContent = `Sent: ${data.channel} \u2192 ${cmd}`;
-          } else {
-            statusEl.className = "status-msg error";
-            statusEl.textContent = `Error: ${data.error}`;
-          }
-        } catch (err) {
-          statusEl.className = "status-msg error";
-          statusEl.textContent = "Command failed.";
-          console.error(err);
-        }
-      }
-
       async function changePlaylist() {
         if (!CHANNEL) return;
         const playlist = playlistSelect.value;

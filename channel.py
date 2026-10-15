@@ -40,14 +40,3 @@ class Channel:
                     for q in list(old_streamer.listener_queues[self.name]):
                         old_streamer.remove_listener(self.name, q)
                         new_streamer.add_listener(self.name, q)
-
-    def send_command(self, cmd: str, streamers: dict):
-        with self._lock:
-            playlist = self.current_playlist
-            if playlist and playlist in streamers:
-                logger.info(f"[Channel] '{self.name}' sending command '{cmd}' to playlist '{playlist}'")
-                streamers[playlist].put_command(cmd)
-                if cmd == "stop":
-                    self.current_playlist = None
-            else:
-                logger.warning(f"[Channel] '{self.name}' command '{cmd}' ignored — no active playlist")

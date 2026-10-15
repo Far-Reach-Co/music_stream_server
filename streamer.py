@@ -24,7 +24,6 @@ class AudioStreamer:
         self.playlist_name = playlist_name
         self.listener_queues = {}  # channel_name -> set[Queue]
         self.listener_queues_lock = threading.Lock()
-        self.command_queue = queue.Queue()
         self.thread = threading.Thread(target=self._run, daemon=True)
 
         self.last_listener_time = time.time()
@@ -71,9 +70,6 @@ class AudioStreamer:
                     channel_count = len(self.listener_queues[channel_name])
             total_count = sum(len(queues) for queues in self.listener_queues.values())
             return channel_count, total_count
-
-    def put_command(self, cmd: str):
-        self.command_queue.put(cmd)
 
     def _run(self):
         try:
@@ -167,18 +163,6 @@ class AudioStreamer:
 
                 try:
                     while True:
-                        # --- commands ---
-                        try:
-                            cmd = self.command_queue.get_nowait()
-                            if cmd == "stop":
-                                logger.info("[Streamer] Stopped.")
-                                return
-                            elif cmd == "next":
-                                logger.info("[Streamer] Skipping track.")
-                                break
-                        except queue.Empty:
-                            pass
-
                         # --- idle detection ---
                         if self.has_listeners():
                             self.last_listener_time = time.time()

@@ -73,7 +73,6 @@ class LoginRedirectException(Exception):
 
 class RadioWebService:
     MAX_CHANNEL_NAME_LENGTH = 256
-    ALLOWED_COMMANDS = {"stop", "next"}
 
     def _get_public_base_url(self, request: Request) -> str:
         if PUBLIC_BASE_URL:
@@ -393,6 +392,11 @@ class RadioWebService:
                 "    <changefreq>daily</changefreq>\n"
                 "    <priority>1.0</priority>\n"
                 "  </url>\n"
+                "  <url>\n"
+                f"    <loc>{base_url}/samples</loc>\n"
+                "    <changefreq>monthly</changefreq>\n"
+                "    <priority>0.7</priority>\n"
+                "  </url>\n"
                 "</urlset>\n"
             )
             return Response(content=xml, media_type="application/xml")
@@ -401,6 +405,11 @@ class RadioWebService:
         @limiter.limit("30/minute")
         def index(request: Request):
             return self._render_file_with_footer("static/index.html", request=request)
+
+        @self.app.get("/samples")
+        @limiter.limit("60/minute")
+        def samples(request: Request):
+            return self._render_file_with_footer("static/samples.html", request=request)
 
         @self.app.get("/listen")
         @limiter.limit("30/minute")
@@ -571,9 +580,14 @@ class RadioWebService:
             if not isinstance(data, dict):
                 raise HTTPException(status_code=400, detail="Expected JSON object")
 
-            cmd = data.get("command")
             channel_name = data.get("channel", "")
             playlist_name = data.get("playlist")
+
+            if "command" in data:
+                raise HTTPException(status_code=400, detail="Track commands are unavailable; choose a playlist instead")
+
+            if not playlist_name:
+                raise HTTPException(status_code=400, detail="Missing playlist")
 
             valid, result = self._validate_channel_name(channel_name)
             if not valid:
@@ -582,21 +596,14 @@ class RadioWebService:
             channel_name = result  # Use validated/normalized name
             try:
                 channel = self._get_channel(channel_name)
-                if playlist_name:
-                    # Validate playlist exists
-                    if get_playlist(playlist_name) is None:
-                        raise HTTPException(status_code=400, detail="Playlist not found")
+                # Validate playlist exists
+                if get_playlist(playlist_name) is None:
+                    raise HTTPException(status_code=400, detail="Playlist not found")
 
-                    if is_pro_playlist(playlist_name) and not self._get_user_is_pro(request):
-                        raise HTTPException(status_code=403, detail="Pro subscription required")
+                if is_pro_playlist(playlist_name) and not self._get_user_is_pro(request):
+                    raise HTTPException(status_code=403, detail="Pro subscription required")
 
-                    channel.play_playlist(playlist_name, self.streamers)
-                elif cmd:
-                    if cmd not in self.ALLOWED_COMMANDS:
-                        raise HTTPException(status_code=400, detail=f"Unknown command: {cmd}")
-                    channel.send_command(cmd, self.streamers)
-                else:
-                    raise HTTPException(status_code=400, detail="Missing command or playlist")
+                channel.play_playlist(playlist_name, self.streamers)
                 return {"status": "ok", "channel": channel_name}
             except HTTPException:
                 raise

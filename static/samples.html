@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="index, follow" />
+    <meta name="description" content="Preview original tabletop RPG music from Far Reach Radio. Hear a three-minute compilation from free playlists for travel, mystery, combat, and more." />
+    <link rel="canonical" href="__BASE_URL__/samples" />
+    <link rel="icon" href="data:," />
+    <title>Tabletop RPG Music Sampler | Far Reach Radio</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <style>
+      body { max-width: 680px; }
+      .sampler-intro { max-width: 550px; margin: 0 auto 26px; }
+      .sampler-card { padding: 28px; text-align: left; }
+      .sampler-kicker { color: var(--orange3); font-size: .78rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+      .sampler-card h2 { margin: 8px 0 6px; color: var(--bright-white); font-size: 1.3rem; }
+      .sampler-card p { color: var(--light-gray); }
+      .sampler-card audio { display: block; width: 100%; margin: 24px 0 0; }
+      .sampler-tracks { margin-top: 16px; padding: 17px 20px; border: 1px solid var(--border-subtle); border-radius: var(--border-radius); background: var(--surface); text-align: left; }
+      .sampler-tracks summary { color: var(--bright-white); cursor: pointer; font-weight: 600; }
+      .sampler-tracks ol { list-style: none; margin-top: 16px; padding: 0; }
+      .sampler-tracks li { display: grid; grid-template-columns: 42px 1fr; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border-subtle); color: var(--main-white); font-size: .9rem; }
+      .sampler-time { color: var(--blue6); font-variant-numeric: tabular-nums; }
+      .sampler-mood { display: block; color: var(--light-gray); font-size: .78rem; margin-top: 2px; }
+      .sampler-back { margin: 26px 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Hear Far Reach Radio</h1>
+    <p class="sampler-intro">A three-minute tour of music from our free playlists. In a session, everyone tunes in to the same playlist stream.</p>
+
+    <section class="card sampler-card" aria-labelledby="sampler-title">
+      <div class="sampler-kicker">The Radio sampler</div>
+      <h2 id="sampler-title">Nine moods, one listen</h2>
+      <p id="sampler-summary">A handpicked compilation of 18 tracks.</p>
+      <audio controls preload="none" src="/static/audio/radio-sampler.mp3" aria-label="Play the Far Reach Radio sampler"></audio>
+    </section>
+
+    <details class="sampler-tracks">
+      <summary>See the tracks in this sampler</summary>
+      <ol id="sampler-track-list"></ol>
+    </details>
+
+    <p class="sampler-back"><a href="/">Explore Far Reach Radio</a></p>
+
+    <script>
+      fetch("/static/audio/radio-sampler.json")
+        .then(response => { if (!response.ok) throw new Error("Catalog unavailable"); return response.json(); })
+        .then(catalog => {
+          document.getElementById("sampler-summary").textContent =
+            `${catalog.tracks.length} tracks from the free playlists · ${Math.round(catalog.duration_seconds / 60)} minutes`;
+          const list = document.getElementById("sampler-track-list");
+          catalog.tracks.forEach(track => {
+            const item = document.createElement("li");
+            const time = document.createElement("span");
+            time.className = "sampler-time";
+            time.textContent = `${Math.floor(track.at_seconds / 60)}:${String(track.at_seconds % 60).padStart(2, "0")}`;
+            const detail = document.createElement("span");
+            detail.textContent = track.title;
+            const mood = document.createElement("span");
+            mood.className = "sampler-mood";
+            mood.textContent = track.playlist;
+            detail.append(mood);
+            item.append(time, detail);
+            list.append(item);
+          });
+        })
+        .catch(() => {
+          document.getElementById("sampler-summary").textContent = "The sampler is being prepared. Please try again soon.";
+        });
+    </script>
+    <div id="site-footer" aria-hidden="true"></div>
+  </body>
+</html>

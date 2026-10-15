@@ -1,6 +1,6 @@
 # Music Streaming Server | Far Reach Co.
 
-A music streaming server built with FastAPI, FFmpeg, and Redis-backed sessions. Streams audio files from S3/CloudFront using signed URLs and allows authenticated users to control playback. Tracks are registered via CSV and organized into named playlists.
+A music streaming server built with FastAPI, FFmpeg, and Redis-backed sessions. Streams audio files from S3/CloudFront using signed URLs and lets authenticated hosts choose shared playlists. Tracks are registered via CSV and organized into named playlists.
 
 ---
 
@@ -177,6 +177,10 @@ Or with `uvicorn` manually:
 uvicorn radio:service.app --reload --host 0.0.0.0 --port 5000
 ```
 
+### Radio sampler
+
+Edit `scripts/radio_sampler_selection.json` to choose up to 20 tracks from free FRC playlists, then run `python scripts/build_compilation.py`. The script cuts ten seconds from each selected master and joins them into one MP3 and track list under `static/audio/`. Open `/samples` to review it. Add `start_seconds` to a selection entry to choose a different moment in that track.
+
 ---
 
 ## Artifact Deploy (No Git on Server)
@@ -285,17 +289,9 @@ Response format:
 ```
 
 ### `POST /command`
-Requires login. Controls playback or switches playlists.
+Requires login. Selects the playlist for a channel:
 
-Send a command (next/stop):
-```json
-{
-  "channel": "my_channel",
-  "command": "next"
-}
-```
-
-Or switch to a playlist by name:
+Streams are shared by playlist, so track-level playback commands are unavailable.
 ```json
 {
   "channel": "my_channel",

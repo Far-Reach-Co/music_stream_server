@@ -1,0 +1,113 @@
+{
+  "duration_seconds": 180,
+  "tracks": [
+    {
+      "key": "HAUNTING_TAVERN_REMST_FULLMIX",
+      "title": "Haunting Tavern - Remastered",
+      "playlist": "Peaceful",
+      "at_seconds": 0
+    },
+    {
+      "key": "AWAKENED_FOREST",
+      "title": "Awakened Forest",
+      "playlist": "Peaceful",
+      "at_seconds": 10
+    },
+    {
+      "key": "A_LAND_OF_YORE",
+      "title": "A Land of Yore",
+      "playlist": "Travel",
+      "at_seconds": 20
+    },
+    {
+      "key": "SAILING_ON_NOVOCAL",
+      "title": "Sailing on",
+      "playlist": "Travel",
+      "at_seconds": 30
+    },
+    {
+      "key": "BREATH_OF_MYSTERY",
+      "title": "Breath of Mystery",
+      "playlist": "Investigation",
+      "at_seconds": 40
+    },
+    {
+      "key": "VANS_THEME_FULLMIX",
+      "title": "Van's Theme",
+      "playlist": "Investigation",
+      "at_seconds": 50
+    },
+    {
+      "key": "STRAY_LIGHTS",
+      "title": "Stray Lights",
+      "playlist": "Creepy",
+      "at_seconds": 60
+    },
+    {
+      "key": "DONT_TOUCH_THE_WATER",
+      "title": "Do Not Touch The Water",
+      "playlist": "Creepy",
+      "at_seconds": 70
+    },
+    {
+      "key": "IMPENDING_DOOM_FULLMIX",
+      "title": "Impending Doom",
+      "playlist": "Tension",
+      "at_seconds": 80
+    },
+    {
+      "key": "MISTY_CASTLE_FULLMIX",
+      "title": "Misty Castle",
+      "playlist": "Tension",
+      "at_seconds": 90
+    },
+    {
+      "key": "EXTERMINATION_FULLMIX",
+      "title": "Extermination",
+      "playlist": "Combat Doomed",
+      "at_seconds": 100
+    },
+    {
+      "key": "APEXPREDATOR_FULLMIX",
+      "title": "Apex Predator",
+      "playlist": "Combat Doomed",
+      "at_seconds": 110
+    },
+    {
+      "key": "THE_WITCH_AND_THE_DRAGON",
+      "title": "The Witch and the Dragon",
+      "playlist": "Combat Heroic",
+      "at_seconds": 120
+    },
+    {
+      "key": "HEROES_IN_THE_MISTS_FULLMIX",
+      "title": "Heroes in the Mists",
+      "playlist": "Combat Heroic",
+      "at_seconds": 130
+    },
+    {
+      "key": "LIFES_REGRET",
+      "title": "Life's Regret",
+      "playlist": "Tragic",
+      "at_seconds": 140
+    },
+    {
+      "key": "ALONE",
+      "title": "Alone",
+      "playlist": "Tragic",
+      "at_seconds": 150
+    },
+    {
+      "key": "LOST_WORLD",
+      "title": "Lost World",
+      "playlist": "Melancholic",
+      "at_seconds": 160
+    },
+    {
+      "key": "AYLA_ACOUSTIC",
+      "title": "Ayla's Theme - Acoustic",
+      "playlist": "Melancholic",
+      "at_seconds": 170
+    }
+  ]
+}
